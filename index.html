@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Liquidador de Nómina</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ============================ BARRA LATERAL ============================ -->
+  <aside class="barra">
+    <div class="marca">
+      <span class="marca-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 3h9l4 4v14H6z"></path><path d="M15 3v4h4"></path>
+          <path d="M9 12h6"></path><path d="M9 16h6"></path>
+        </svg>
+      </span>
+      <span class="marca-texto">
+        <strong>Liquidador</strong>
+        <small>Nómina administrativa</small>
+      </span>
+    </div>
+
+    <nav class="nav" aria-label="Secciones del programa">
+      <button class="nav-btn activo" data-vista="carga">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"></path></svg>
+        <span>Cargar archivos</span>
+        <em class="cuenta" id="cuenta-carga" hidden></em>
+      </button>
+      <button class="nav-btn" data-vista="resultados">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="1.5"></rect><path d="M3 9h18"></path><path d="M9 9v11"></path></svg>
+        <span>Resultados</span>
+        <em class="cuenta" id="cuenta-resultados" hidden></em>
+      </button>
+      <button class="nav-btn" data-vista="reglas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10"></path><path d="M18 7h2"></path><circle cx="16" cy="7" r="2"></circle><path d="M4 17h4"></path><path d="M12 17h8"></path><circle cx="10" cy="17" r="2"></circle></svg>
+        <span>Reglas de cálculo</span>
+      </button>
+      <button class="nav-btn" data-vista="plantilla">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v14H7z"></path><path d="M14 3v4h4"></path><path d="M10 12h5"></path><path d="M10 16h5"></path></svg>
+        <span>Plantilla Excel</span>
+      </button>
+    </nav>
+
+    <div class="barra-pie">
+      <span class="punto" aria-hidden="true"></span>
+      Cálculo local: los datos no salen de este equipo
+    </div>
+  </aside>
+
+  <!-- ============================== CONTENIDO ============================== -->
+  <main class="contenido">
+
+    <!-- ---------------------------- VISTA: CARGA ---------------------------- -->
+    <section class="vista activo" id="vista-carga">
+      <header class="cabecera">
+        <div class="cabecera-texto">
+          <h1>Cargar archivos</h1>
+          <p>Sube uno o varios Excel con la información de los trabajadores. Cada archivo genera su extracto de nómina.</p>
+        </div>
+        <div class="cabecera-botones">
+          <button class="btn" id="btn-limpiar" hidden>Limpiar cola</button>
+          <button class="btn" id="btn-reprocesar-carga" hidden>Reprocesar</button>
+          <button class="btn primario" id="btn-seleccionar">Seleccionar archivos</button>
+        </div>
+      </header>
+
+      <div class="zona" id="zona" role="button" tabindex="0" aria-label="Arrastra o selecciona archivos Excel">
+        <span class="zona-icono" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"></path><path d="m7.5 8.5 4.5-4.5 4.5 4.5"></path><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"></path></svg>
+        </span>
+        <p class="zona-titulo">Arrastra aquí tus archivos Excel</p>
+        <p class="zona-texto">o haz clic para buscarlos · .xlsx, .xls y .csv · puedes agregar varios a la vez</p>
+      </div>
+
+      <div class="cola" id="cola" hidden></div>
+
+      <div class="vacio" id="vacio-carga">
+        <p class="vacio-titulo">Todavía no hay archivos</p>
+        <p class="vacio-texto">Cuando subas el Excel del banco aparecerá acá con su estado: pendiente, procesando o listo.</p>
+      </div>
+    </section>
+
+    <!-- -------------------------- VISTA: RESULTADOS -------------------------- -->
+    <section class="vista" id="vista-resultados">
+      <header class="cabecera">
+        <div class="cabecera-texto">
+          <h1>Resultados</h1>
+          <p>Revisa cada extracto en pantalla y descárgalo. El botón de la derecha baja todo en un solo archivo .zip.</p>
+        </div>
+        <div class="cabecera-botones">
+          <button class="btn primario" id="btn-zip" disabled>Descargar todo (.zip)</button>
+        </div>
+      </header>
+
+      <div class="tarjetas" id="tarjetas">
+        <div class="tarjeta-dato"><span class="dato-etiqueta">Extractos listos</span><span class="dato-valor" id="dato-archivos">0</span></div>
+        <div class="tarjeta-dato"><span class="dato-etiqueta">Empleados</span><span class="dato-valor" id="dato-empleados">0</span></div>
+        <div class="tarjeta-dato"><span class="dato-etiqueta">Neto a pagar</span><span class="dato-valor" id="dato-neto">$&nbsp;0</span></div>
+        <div class="tarjeta-dato"><span class="dato-etiqueta">Descuentos</span><span class="dato-valor" id="dato-descuentos">$&nbsp;0</span></div>
+      </div>
+
+      <div class="lista" id="lista-resultados"></div>
+
+      <div class="vacio" id="vacio-resultados">
+        <p class="vacio-titulo">Sin resultados todavía</p>
+        <p class="vacio-texto">Carga un archivo en la sección anterior y el extracto aparecerá listo acá.</p>
+      </div>
+    </section>
+
+    <!-- --------------------------- VISTA: REGLAS --------------------------- -->
+    <section class="vista" id="vista-reglas">
+      <header class="cabecera">
+        <div class="cabecera-texto">
+          <h1>Reglas de cálculo</h1>
+          <p>Valores que usa el liquidador. Se guardan en este equipo y se aplican cada vez que procesas archivos.</p>
+        </div>
+        <div class="cabecera-botones">
+          <button class="btn" id="btn-reprocesar-reglas" hidden>Reprocesar archivos</button>
+          <button class="btn" id="btn-restaurar">Valores del problema</button>
+          <button class="btn primario" id="btn-guardar">Guardar reglas</button>
+        </div>
+      </header>
+
+      <div class="rejilla">
+        <div class="tarjeta">
+          <h2>Tarifa por hora y rol</h2>
+          <div class="campo">
+            <label for="r-gerente">Gerente</label>
+            <span class="entrada"><i class="prefijo">$</i><input type="number" id="r-gerente" min="0" step="1000"><i class="sufijo">/hora</i></span>
+          </div>
+          <div class="campo">
+            <label for="r-admin">Admin</label>
+            <span class="entrada"><i class="prefijo">$</i><input type="number" id="r-admin" min="0" step="1000"><i class="sufijo">/hora</i></span>
+          </div>
+          <div class="campo">
+            <label for="r-operario">Operario</label>
+            <span class="entrada"><i class="prefijo">$</i><input type="number" id="r-operario" min="0" step="1000"><i class="sufijo">/hora</i></span>
+          </div>
+          <p class="nota">Salario base = horas trabajadas del mes × tarifa del rol.</p>
+        </div>
+
+        <div class="tarjeta">
+          <h2>Subsidio de hijos</h2>
+          <div class="campo">
+            <label for="r-hijo">Valor por hijo</label>
+            <span class="entrada"><i class="prefijo">$</i><input type="number" id="r-hijo" min="0" step="1000"><i class="sufijo">por hijo</i></span>
+          </div>
+          <div class="campo">
+            <label for="r-tope">Tope de hijos</label>
+            <span class="entrada"><input type="number" id="r-tope" min="0" step="1"><i class="sufijo">hijos máx.</i></span>
+          </div>
+          <p class="nota">Con los valores del problema: 1 hijo = $200.000, 2 = $400.000, 3 o más = tope de $600.000.</p>
+        </div>
+
+        <div class="tarjeta">
+          <h2>Recargos y jornada</h2>
+          <div class="campo">
+            <label for="r-extra">Horas extras</label>
+            <span class="entrada"><input type="number" id="r-extra" min="0" step="1"><i class="sufijo">% recargo</i></span>
+          </div>
+          <div class="campo">
+            <label for="r-domingo">Domingos trabajados</label>
+            <span class="entrada"><input type="number" id="r-domingo" min="0" step="1"><i class="sufijo">% recargo</i></span>
+          </div>
+          <div class="campo">
+            <label for="r-feriado">Feriados trabajados</label>
+            <span class="entrada"><input type="number" id="r-feriado" min="0" step="1"><i class="sufijo">% recargo</i></span>
+          </div>
+          <div class="campo">
+            <label for="r-nocturno">Horas nocturnas</label>
+            <span class="entrada"><input type="number" id="r-nocturno" min="0" step="1"><i class="sufijo">% recargo</i></span>
+          </div>
+          <div class="campo">
+            <label for="r-jornada">Jornada diaria</label>
+            <span class="entrada"><input type="number" id="r-jornada" min="1" step="1"><i class="sufijo">horas</i></span>
+          </div>
+          <p class="nota">Cada domingo o feriado se valora como una jornada completa (con su recargo). Las horas extras y nocturnas se pagan por hora.</p>
+        </div>
+
+        <div class="tarjeta">
+          <h2>Descuentos de seguridad social</h2>
+          <div class="campo">
+            <label for="r-salud">Salud EPS</label>
+            <span class="entrada"><input type="number" id="r-salud" min="0" step="0.1"><i class="sufijo">%</i></span>
+          </div>
+          <div class="campo">
+            <label for="r-pension">Pensión</label>
+            <span class="entrada"><input type="number" id="r-pension" min="0" step="0.1"><i class="sufijo">%</i></span>
+          </div>
+          <div class="campo">
+            <label for="r-solidaridad">Fondo de solidaridad</label>
+            <span class="entrada"><input type="number" id="r-solidaridad" min="0" step="0.1"><i class="sufijo">%</i></span>
+          </div>
+          <p class="nota">Se calculan sobre el salario base (horas × tarifa). Vivienda, libranzas y otros descuentos se toman columna por columna del Excel.</p>
+        </div>
+
+        <div class="tarjeta">
+          <h2>Cesantías por salida</h2>
+          <div class="campo campo-check">
+            <label for="r-cesantias">Incluir cesantías en la liquidación</label>
+            <input type="checkbox" id="r-cesantias">
+          </div>
+          <div class="campo">
+            <label for="r-cesantias-pct">Porcentaje</label>
+            <span class="entrada"><input type="number" id="r-cesantias-pct" min="0" step="0.01"><i class="sufijo">%</i></span>
+          </div>
+          <p class="nota">Se calcula sobre el salario base y se suma como ingreso al neto a pagar. Déjalo apagado para nóminas mensuales normales.</p>
+        </div>
+
+        <div class="tarjeta tarjeta-ancho">
+          <h2>Columnas del Excel</h2>
+          <p class="nota">El sistema reconoce los encabezados más comunes solo. Si el archivo del banco usa otros nombres, asignalos acá y vuelve a procesar. Las columnas de la derecha salen de lo que ya subiste.</p>
+          <div class="mapeo" id="mapeo">
+            <p class="nota">Todavía no se ha leído ningún archivo. Sube uno y las columnas que traiga aparecerán acá.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- -------------------------- VISTA: PLANTILLA -------------------------- -->
+    <section class="vista" id="vista-plantilla">
+      <header class="cabecera">
+        <div class="cabecera-texto">
+          <h1>Plantilla Excel</h1>
+          <p>Si prefieres armar el archivo desde cero, baja esta plantilla. También sirve para ver cómo se llaman las columnas que el sistema espera.</p>
+        </div>
+        <div class="cabecera-botones">
+          <button class="btn primario" id="btn-plantilla">Descargar plantilla (.xlsx)</button>
+        </div>
+      </header>
+
+      <div class="tarjeta tarjeta-ancho">
+        <h2>Columnas de entrada</h2>
+        <div class="tabla-envoltura">
+          <table class="tabla">
+            <thead>
+              <tr><th>Columna</th><th>Obligatoria</th><th>Qué contiene</th><th>Ejemplo</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Nombre completo</td><td>Sí</td><td>Nombre y apellidos del trabajador</td><td>Ana Pérez</td></tr>
+              <tr><td>Cédula</td><td>Recomendada</td><td>Identificación sin puntos ni espacios</td><td>100000001</td></tr>
+              <tr><td>Rol</td><td>Sí</td><td>Gerente, Admin u Operario (también acepta "cargo")</td><td>Operario</td></tr>
+              <tr><td>Hijos</td><td>No</td><td>Cantidad de hijos a cargo</td><td>2</td></tr>
+              <tr><td>Horas</td><td>Sí</td><td>Horas trabajadas en el mes</td><td>160</td></tr>
+              <tr><td>Horas extras</td><td>No</td><td>Horas extra del mes</td><td>4</td></tr>
+              <tr><td>Domingos</td><td>No</td><td>Domingos trabajados en el mes</td><td>1</td></tr>
+              <tr><td>Festivos</td><td>No</td><td>Feriados trabajados en el mes</td><td>0</td></tr>
+              <tr><td>Nocturnas</td><td>No</td><td>Horas nocturnas del mes</td><td>10</td></tr>
+              <tr><td>Primas</td><td>No</td><td>Valor de primas pagadas en el mes</td><td>150000</td></tr>
+              <tr><td>Vivienda</td><td>No</td><td>Descuento por préstamo de vivienda</td><td>350000</td></tr>
+              <tr><td>Libranza / préstamo</td><td>No</td><td>Descuento por préstamo bancario o libranza</td><td>200000</td></tr>
+              <tr><td>Otros descuentos</td><td>No</td><td>Cualquier otro descuento fijo</td><td>50000</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2>Forma de leer</h2>
+        <ul class="lista-simple">
+          <li>Las filas cuyo nombre empieza con <strong>EJEMPLO</strong> se ignoran al procesar: sirven para probar sin ensuciar la nómina.</li>
+          <li>Los encabezados se leen sin importar mayúsculas ni tildes: "Cédula", "CEDULA" o "c.c." valen lo mismo.</li>
+          <li>Los valores monetarios aceptan formato colombiano: <strong>$200.000</strong>, <strong>1.500.000</strong> o <strong>350.000,50</strong>.</li>
+          <li>Si el sistema no reconoce un encabezado, se asigna en <strong>Reglas de cálculo → Columnas del Excel</strong>.</li>
+          <li>Se lee la primera hoja del archivo. Si el Excel trae varias hojas, deja los datos en la primera.</li>
+        </ul>
+
+        <h2>Lo que entrega el sistema</h2>
+        <p class="nota">Un .xlsx por archivo subido, con una fila por trabajador: salarios, recargos, subsidio de hijos, cesantías (si están activas), descuentos de seguridad social, libranzas y el <strong>neto a pagar</strong>, más una fila de totales al final.</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="avisos" id="avisos" aria-live="polite"></div>
+<input type="file" id="entrada" multiple accept=".xlsx,.xls,.csv" hidden>
+
+<script src="libs/xlsx.full.min.js"></script>
+<script src="libs/jszip.min.js"></script>
+<script src="logica.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

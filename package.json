@@ -1,0 +1,28 @@
+{
+  "name": "liquidador-nomina",
+  "version": "1.0.0",
+  "description": "Liquidador de nómina administrativa — sube Excel, genera extractos de nómina en lote",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n srv,tests,pack -c cyan,magenta,green \"npm:dev:server\" \"npm:dev:tests\" \"npm:dev:pack\"",
+    "dev:server": "live-server --port=8080 --no-browser --watch=index.html,styles.css,app.js,logica.js",
+    "dev:tests": "node --watch test/test-logica.mjs",
+    "dev:pack": "node --watch-path=index.html --watch-path=styles.css --watch-path=app.js --watch-path=logica.js test/empaquetar.mjs",
+    "build": "node test/empaquetar.mjs",
+    "test": "node test/test-logica.mjs && node test/pipeline.mjs",
+    "ejemplos": "node test/generar-ejemplos.mjs"
+  },
+  "keywords": [
+    "nomina",
+    "excel",
+    "liquidacion"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5",
+    "live-server": "^1.2.2"
+  }
+}
