@@ -2,4 +2,24 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# Logs y archivos temporales de herramientas
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.pid
+*.pid.lock
+*.swp
+*.swo
+
+# Resultados locales de pruebas y cobertura
+coverage/
+.coverage
+.nyc_output/
 ejemplos/muestra_extracto_salida.xlsx
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
