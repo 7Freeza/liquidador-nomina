@@ -257,7 +257,12 @@
         if (!user.passwordChangeRequired) await loadBase();
         showPortal();
       } else showLogin();
-    } catch { showLogin(); }
+    } catch {
+      // Sin backend (archivo suelto o servidor caído): modo local con el flujo por lotes v1.2
+      $('#auth-screen').hidden = true;
+      $('#portal').hidden = true;
+      $('#legacy-app').hidden = false;
+    }
   }
   document.addEventListener('DOMContentLoaded', init, { once: true });
 })();
