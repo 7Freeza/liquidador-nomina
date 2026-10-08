@@ -7,7 +7,30 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="app">
+<section class="auth-screen" id="auth-screen">
+  <form class="auth-form" id="login-form">
+    <p class="eyebrow">NÓMINA · ACCESO SEGURO</p>
+    <h1>Liquidador</h1>
+    <label>Correo institucional<input type="email" name="email" autocomplete="username" required></label>
+    <label>Contraseña<input type="password" name="password" autocomplete="current-password" required></label>
+    <button class="btn primario" type="submit">Iniciar sesión</button>
+    <p class="form-error" id="login-error" role="alert"></p>
+  </form>
+</section>
+
+<section class="portal" id="portal" hidden>
+  <aside class="portal-side">
+    <div class="portal-brand"><strong>Liquidador</strong><small id="portal-user"></small></div>
+    <nav id="portal-nav" aria-label="Secciones"></nav>
+    <button class="nav-btn" id="logout-button">Cerrar sesión</button>
+  </aside>
+  <main class="portal-content">
+    <div id="portal-view"></div>
+    <p class="portal-notice" id="portal-notice" aria-live="polite"></p>
+  </main>
+</section>
+
+<div class="app" id="legacy-app" hidden>
 
   <!-- ============================ BARRA LATERAL ============================ -->
   <aside class="barra">
@@ -282,5 +305,6 @@
 <script src="libs/jszip.min.js"></script>
 <script src="logica.js"></script>
 <script src="app.js"></script>
+<script src="portal.js"></script>
 </body>
 </html>
