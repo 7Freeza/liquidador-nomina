@@ -4,10 +4,11 @@
   "description": "Liquidador de nómina administrativa — sube Excel, genera extractos de nómina en lote",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n srv,tests,pack -c cyan,magenta,green \"npm:dev:server\" \"npm:dev:tests\" \"npm:dev:pack\"",
-    "dev:server": "live-server --port=8080 --no-browser --watch=index.html,styles.css,app.js,logica.js",
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "dev:server": "node --watch server.js",
     "dev:tests": "node --watch test/test-logica.mjs",
-    "dev:pack": "node --watch-path=index.html --watch-path=styles.css --watch-path=app.js --watch-path=logica.js test/empaquetar.mjs",
+    "dev:pack": "node --watch-path=index.html --watch-path=styles.css --watch-path=app.js --watch-path=portal.js --watch-path=logica.js test/empaquetar.mjs",
     "build": "node test/empaquetar.mjs",
     "test": "node test/test-logica.mjs && node test/pipeline.mjs",
     "ejemplos": "node test/generar-ejemplos.mjs"
@@ -19,10 +20,22 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "devDependencies": {
     "concurrently": "^10.0.5",
     "live-server": "^1.2.2"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "connect-pg-simple": "^10.0.0",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "express-session": "^1.18.2",
+    "helmet": "^8.1.0",
+    "multer": "^2.0.2",
+    "nodemailer": "^10.0.16",
+    "pg": "^8.16.3"
   }
 }

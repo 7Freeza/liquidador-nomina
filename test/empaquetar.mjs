@@ -10,7 +10,7 @@ const leer = p => fs.readFileSync(path.join(raiz, p), 'utf8');
 let html = leer('index.html');
 
 const css = leer('styles.css');
-const js = ['libs/xlsx.full.min.js', 'libs/jszip.min.js', 'logica.js', 'app.js']
+const js = ['libs/xlsx.full.min.js', 'libs/jszip.min.js', 'logica.js', 'app.js', 'portal.js']
   .map(leer)
   .join('\n;\n');
 
@@ -20,7 +20,7 @@ html = html.replace(
 );
 
 html = html.replace(
-  /<script src="libs\/xlsx\.full\.min\.js"><\/script>\s*<script src="libs\/jszip\.min\.js"><\/script>\s*<script src="logica\.js"><\/script>\s*<script src="app\.js"><\/script>/,
+  /<script src="libs\/xlsx\.full\.min\.js"><\/script>\s*<script src="libs\/jszip\.min\.js"><\/script>\s*<script src="logica\.js"><\/script>\s*<script src="app\.js"><\/script>\s*<script src="portal\.js"><\/script>/,
   () => '<script>\n' + js + '\n</script>'
 );
 

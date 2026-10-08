@@ -1,0 +1,8 @@
+El programa actual unicamente permite un tipo de accion, cargar los datos de los empleados mediante la importacion de un archivo CSV o EXCEL, se debe mantener un apartado para creacion de datos de empleados de manera manual, digitando sus datos: Nombre, Cedula, Numero de Telefono, Correo etc, los mismos datos que aparecen en las columnas de la plantilla excel pero de manera manual, permitiendo ahi la creacion de nuevos roles (Gerente, Admin, Operario), incluyendo la eliminacion de aquellos roles, una vista de busqueda que permita observar los empleados clasificados por roles y permitirle eliminar empleados incluyendo la modificacion de los datos existentes de un empleado actual como (su rol, numero de hijos etc...)
+
+Esto mencionado desde la vista de Administrador (UNICAMENTE EL ADMINISTRADOR PUEDE CREAR E IMPORTAR EXCEL DE EMPLEADOS), 
+
+En la vista de liquidador (Cada una de las vistas seran accedidas por medio de credenciales unicas de acceso que les permitiran tener acceso a sus funciones), se incluye la busqueda por clasificacion de trabajadores, sin funciones de eliminacion o edicion de sus datos, desde su vista manualmente puede liquidar las horas trabajadas por los empleados, ahi incluye (horas extra etc...) y la funcion de enviar a correo con la extraccion de nomina especifica de ese empleado. 
+
+Incluyendo ademas un dashboard donde se pueda verificar que el empleado leyo el correo, incluyendo un boton por correo que permita validarlo y registrarlo en el sistema, añadiendo la funcion para Whatsapp, para que pueda recibir correctamente la extraccion de nomina y al momento del empleado responder, este de igual maenra se pueda registrar en la dashboard como "leido".
+
