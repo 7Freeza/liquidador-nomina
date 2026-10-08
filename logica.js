@@ -47,7 +47,9 @@
     libranza: ['libranza', 'prestamo', 'prestamo bancario', 'credito personal', 'banco',
       'cuota banco', 'descuento prestamo', 'libranzas'],
     otros: ['otros descuentos', 'otros', 'descuentos varios', 'descuento otros',
-      'varios', 'otro descuento']
+      'varios', 'otro descuento'],
+    correo: ['correo', 'email', 'e mail', 'correo electronico', 'mail',
+      'correo electronico del trabajador', 'direccion de correo']
   };
 
   var CAMPOS_REQUERIDOS = ['nombre', 'rol'];
@@ -243,9 +245,11 @@
 
     var ingresos = base + vExtras + vDomingos + vFeriados + vNocturnas + prima + subsidio + cesantias;
 
-    var salud = base * (aNumero(R.descuentos.salud) / 100);
-    var pension = base * (aNumero(R.descuentos.pension) / 100);
-    var solidaridad = base * (aNumero(R.descuentos.solidaridad) / 100);
+    // Seguridad social: "a esta liquidez se le hacen descuentos" →
+    // el porcentaje se aplica sobre el TOTAL liquidado, no solo sobre la base.
+    var salud = ingresos * (aNumero(R.descuentos.salud) / 100);
+    var pension = ingresos * (aNumero(R.descuentos.pension) / 100);
+    var solidaridad = ingresos * (aNumero(R.descuentos.solidaridad) / 100);
     var vivienda = num(datos.vivienda);
     var libranza = num(datos.libranza);
     var otros = num(datos.otros);
@@ -256,6 +260,7 @@
     return {
       nombre: String(datos.nombre || '').trim(),
       cc: String(datos.cc === undefined || datos.cc === null ? '' : datos.cc).trim(),
+      correo: String(datos.correo || '').trim(),
       rol: rol,
       rolTexto: rol.charAt(0).toUpperCase() + rol.slice(1),
       hijos: hijos,
@@ -348,6 +353,7 @@
       var datos = {
         nombre: nombre,
         cc: typeof cc === 'number' ? String(cc) : cc,
+        correo: String(val(fila, 'correo') || '').trim(),
         rol: rol,
         hijos: val(fila, 'hijos'),
         horas: val(fila, 'horas'),
@@ -380,6 +386,20 @@
   // columnas que llevan formato de miles en el Excel
   var SALIDA_DINERO = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22];
 
+  /* Signos visuales (pedido del liquidador): subsidio con "+" y descuentos con "-".
+     El valor sigue siendo POSITIVO (los totales cuadran); el signo es solo formato. */
+  var SALIDA_SIGNO = { 12: '+', 15: '-', 16: '-', 17: '-', 18: '-', 19: '-', 20: '-', 21: '-' };
+
+  // Formato numérico por columna para el Excel generado (z de SheetJS)
+  function formatosSalida() {
+    var z = {};
+    SALIDA_DINERO.forEach(function (c) { z[c] = '#,##0'; });
+    Object.keys(SALIDA_SIGNO).forEach(function (c) {
+      z[c] = SALIDA_SIGNO[c] === '+' ? '"+"#,##0' : '"-"#,##0';
+    });
+    return z;
+  }
+
   function filaSalida(e) {
     return [
       e.nombre, e.cc, e.rolTexto, e.hijos, e.horas, e.valorHora,
@@ -407,6 +427,7 @@
     total[0] = 'TOTALES';
     total[1] = '';
     total[2] = '';
+    total[5] = ''; // "Valor hora" no se suma: no tiene sentido sumar tarifas
     return total;
   }
 
@@ -449,10 +470,10 @@
   var PLANTILLA_FILAS = [
     ['Nombre completo', 'Cédula', 'Rol', 'Hijos', 'Horas', 'Horas extras',
       'Domingos', 'Festivos', 'Nocturnas', 'Primas', 'Vivienda',
-      'Libranza / préstamo', 'Otros descuentos'],
-    ['EJEMPLO — Ana Pérez', '100000001', 'Gerente', 2, 160, 4, 1, 0, 10, 0, 350000, 200000, 0],
-    ['EJEMPLO — Luis Gómez', '100000002', 'Admin', 1, 160, 0, 0, 1, 0, 150000, 0, 0, 50000],
-    ['EJEMPLO — Marta Ruiz', '100000003', 'Operario', 4, 160, 8, 2, 0, 20, 0, 0, 0, 0]
+      'Libranza / préstamo', 'Otros descuentos', 'Correo'],
+    ['EJEMPLO — Ana Pérez', '100000001', 'Gerente', 2, 160, 4, 1, 0, 10, 0, 350000, 200000, 0, 'ana.perez@banco.com.co'],
+    ['EJEMPLO — Luis Gómez', '100000002', 'Admin', 1, 160, 0, 0, 1, 0, 150000, 0, 0, 50000, 'luis.gomez@banco.com.co'],
+    ['EJEMPLO — Marta Ruiz', '100000003', 'Operario', 4, 160, 8, 2, 0, 20, 0, 0, 0, 0, 'marta.ruiz@banco.com.co']
   ];
 
   return {
@@ -473,6 +494,8 @@
     filaSalida: filaSalida,
     filaTotales: filaTotales,
     SALIDA_DINERO: SALIDA_DINERO,
+    SALIDA_SIGNO: SALIDA_SIGNO,
+    formatosSalida: formatosSalida,
     hojaSalida: hojaSalida,
     anchosColumnas: anchosColumnas,
     resumen: resumen

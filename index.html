@@ -111,6 +111,21 @@
       </div>
     </section>
 
+    <!-- ------------------------ VISTA: TRABAJADOR ------------------------ -->
+    <section class="vista" id="vista-trabajador">
+      <header class="cabecera">
+        <div class="cabecera-texto">
+          <button class="btn" id="btn-volver">← Volver a resultados</button>
+          <h1 id="ficha-nombre" style="margin-top:14px">—</h1>
+          <p id="ficha-meta">—</p>
+        </div>
+        <div class="cabecera-botones">
+          <button class="btn primario" id="btn-descargar-individual">Descargar extracto de este trabajador</button>
+        </div>
+      </header>
+      <div class="ficha" id="ficha-cuerpo"></div>
+    </section>
+
     <!-- --------------------------- VISTA: REGLAS --------------------------- -->
     <section class="vista" id="vista-reglas">
       <header class="cabecera">
@@ -195,7 +210,7 @@
             <label for="r-solidaridad">Fondo de solidaridad</label>
             <span class="entrada"><input type="number" id="r-solidaridad" min="0" step="0.1"><i class="sufijo">%</i></span>
           </div>
-          <p class="nota">Se calculan sobre el salario base (horas × tarifa). Vivienda, libranzas y otros descuentos se toman columna por columna del Excel.</p>
+          <p class="nota">Se calculan sobre el <strong>total liquidado</strong> (ingresos: salario + recargos + subsidio), como indica el enunciado: "a esta liquidez se le hacen descuentos". Vivienda, libranzas y otros descuentos se toman columna por columna del Excel.</p>
         </div>
 
         <div class="tarjeta">
@@ -254,6 +269,7 @@
               <tr><td>Vivienda</td><td>No</td><td>Descuento por préstamo de vivienda</td><td>350000</td></tr>
               <tr><td>Libranza / préstamo</td><td>No</td><td>Descuento por préstamo bancario o libranza</td><td>200000</td></tr>
               <tr><td>Otros descuentos</td><td>No</td><td>Cualquier otro descuento fijo</td><td>50000</td></tr>
+              <tr><td>Correo</td><td>Para enviar</td><td>Correo del trabajador; habilita el botón "Enviar por correo"</td><td>ana.perez@banco.com.co</td></tr>
             </tbody>
           </table>
         </div>
@@ -265,6 +281,14 @@
           <li>Los valores monetarios aceptan formato colombiano: <strong>$200.000</strong>, <strong>1.500.000</strong> o <strong>350.000,50</strong>.</li>
           <li>Si el sistema no reconoce un encabezado, se asigna en <strong>Reglas de cálculo → Columnas del Excel</strong>.</li>
           <li>Se lee la primera hoja del archivo. Si el Excel trae varias hojas, deja los datos en la primera.</li>
+        </ul>
+
+        <h2>Cómo leer el extracto</h2>
+        <ul class="lista-simple">
+          <li>Los <strong>subsidios</strong> se muestran con signo <strong>+</strong> y los <strong>descuentos</strong> con <strong>−</strong> para identificarlos de un vistazo.</li>
+          <li>El <strong>neto a pagar</strong> siempre es el valor final positivo.</li>
+          <li>Hacé clic sobre el <strong>nombre de un trabajador</strong> en la vista previa para abrir su ficha individual.</li>
+          <li><strong>Enviar por correo</strong> arma un .zip con el extracto de cada trabajador (solo el suyo) y un ejecutable que los envía por Outlook de una sola vez.</li>
         </ul>
 
         <h2>Lo que entrega el sistema</h2>

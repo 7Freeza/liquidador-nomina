@@ -43,10 +43,10 @@ eq('valor hora', ger.valorHora, 100000);
 eq('base', ger.base, 4000000);
 eq('subsidio', ger.subsidio, 200000);
 eq('total ingresos', ger.totalIngresos, 4200000);
-eq('salud 4%', ger.salud, 160000);
-eq('pensión 4%', ger.pension, 160000);
-eq('total descuentos', ger.totalDescuentos, 320000);
-eq('neto', ger.neto, 3880000);
+eq('salud 4% sobre el total liquidado', ger.salud, 168000);
+eq('pensión 4% sobre el total liquidado', ger.pension, 168000);
+eq('total descuentos', ger.totalDescuentos, 336000);
+eq('neto', ger.neto, 3864000);
 
 console.log('\n— recargos (valores por defecto: extra 25%, domingo 50%, feriado 100%, nocturno 35%) —');
 const ext = L.liquidarEmpleado({ nombre: 'X', rol: 'gerente', horas: 40, extras: 2 }, R);
@@ -62,7 +62,9 @@ console.log('\n— cesantías por salida —');
 const ces = L.clonarReglas(R); ces.cesantias.incluir = true;
 const c1 = L.liquidarEmpleado({ nombre: 'X', rol: 'gerente', hijos: 1, horas: 40 }, ces);
 eq('8,33% de 4.000.000 = 333.200', c1.cesantias, 333200);
-eq('cesantías suman al neto', c1.neto, 3880000 + 333200);
+// ingresos = 4.000.000 + 200.000 (subsidio) + 333.200 (cesantías) = 4.533.200
+// descuentos = 4.533.200 × 8% = 362.656 → neto = 4.170.544
+eq('cesantías suman al neto', c1.neto, 4170544);
 const c2 = L.liquidarEmpleado({ nombre: 'X', rol: 'gerente', horas: 40 }, R);
 eq('cesantías desactivadas = 0', c2.cesantias, 0);
 
@@ -106,7 +108,7 @@ const filas = [
 const mapeo = { nombre: 0, cc: 1, rol: 2, hijos: 3, horas: 4 };
 const res = L.procesarFilas(filas, mapeo, R);
 eq('liquidados: Ana + Luisa', res.empleados.length, 2);
-eq('Ana neto', res.empleados[0].neto, 3880000);
+eq('Ana neto', res.empleados[0].neto, 3864000);
 eq('Luisa subsidio tope 600k', res.empleados[1].subsidio, 600000);
 eq('fila de ejemplo omitida', res.omitidas, 1);
 eq('2 observaciones (fila vacía + rol Cajero)', res.observaciones.length, 2);
@@ -124,6 +126,20 @@ console.log('\n— resumen —');
 const r = L.resumen(res.empleados);
 eq('empleados', r.empleados, 2);
 eq('neto coincide con hoja', r.neto, hoja[hoja.length - 1][22]);
+
+console.log('\n— signos visuales y correo —');
+eq('subsidio con signo +', L.SALIDA_SIGNO[12], '+');
+eq('salud con signo -', L.SALIDA_SIGNO[15], '-');
+eq('pensión con signo -', L.SALIDA_SIGNO[16], '-');
+eq('total descuentos con signo -', L.SALIDA_SIGNO[21], '-');
+eq('neto sin signo', L.SALIDA_SIGNO[22], undefined);
+eq('formato Excel subsidio', L.formatosSalida()[12], '"+"#,##0');
+eq('formato Excel descuento', L.formatosSalida()[21], '"-"#,##0');
+eq('formato Excel base (sin signo)', L.formatosSalida()[6], '#,##0');
+const empCorreo = L.liquidarEmpleado({ nombre: 'A', rol: 'gerente', horas: 40, correo: 'a@banco.com.co' }, R);
+eq('correo pasa por la liquidación', empCorreo.correo, 'a@banco.com.co');
+const detCorreo = L.detectarTabla([['Nombre', 'Cédula', 'Rol', 'Correo electrónico'], ['A', '1', 'Gerente', 'a@x.co']]);
+eq('detecta columna Correo electrónico', detCorreo.mapeo.correo, 3);
 
 console.log('\n' + (fail === 0 ? 'TODO OK' : 'FALLAS: ' + fail) + ' · pass=' + pass + ' fail=' + fail);
 process.exit(fail === 0 ? 0 : 1);

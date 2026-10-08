@@ -26,7 +26,7 @@
     nombre: 'Nombre completo', cc: 'Cédula', rol: 'Rol', hijos: 'Hijos', horas: 'Horas',
     extras: 'Horas extras', domingos: 'Domingos', feriados: 'Festivos',
     nocturnas: 'Nocturnas', prima: 'Primas', vivienda: 'Vivienda',
-    libranza: 'Libranza / préstamo', otros: 'Otros descuentos'
+    libranza: 'Libranza / préstamo', otros: 'Otros descuentos', correo: 'Correo'
   };
   var ORDEN_CAMPOS = Object.keys(ETIQUETAS_CAMPO);
 
@@ -36,7 +36,8 @@
     mapeoManual: leerJSON(CLAVE_MAPEO) || {},
     headersVistos: null,
     procesando: 0,
-    siguienteId: 1
+    siguienteId: 1,
+    ficha: null
   };
 
   /* ------------------------------ Utilidades ------------------------------ */
@@ -136,7 +137,8 @@
   /* -------------------------------- Vistas -------------------------------- */
 
   function irA(vista) {
-    $$('.nav-btn').forEach(function (b) { b.classList.toggle('activo', b.dataset.vista === vista); });
+    var navVista = vista === 'trabajador' ? 'resultados' : vista; // la ficha es una sub-vista de resultados
+    $$('.nav-btn').forEach(function (b) { b.classList.toggle('activo', b.dataset.vista === navVista); });
     $$('.vista').forEach(function (s) { s.classList.toggle('activo', s.id === 'vista-' + vista); });
     if (vista === 'resultados') renderResultados();
     if (vista === 'reglas') renderMapeo();
@@ -252,6 +254,7 @@
       item.obs = res.observaciones;
       item.resumen = L.resumen(res.empleados);
       item.salida = construirSalida(item);
+      item.tieneCorreo = mapeo.correo !== undefined;
       item.salidaNombre = 'Nomina_' + baseNombre(item.nombre) + '_' + hoy() + '.xlsx';
       item.estado = 'listo';
       item.detalle = '';
@@ -305,15 +308,17 @@
 
   /* ------------------------ Construcción del extracto ---------------------- */
 
-  function construirSalida(item) {
-    var aoa = L.hojaSalida(item.empleados, { origen: item.nombre, fecha: fechaCorta() });
+  // Hoja de salida genérica: recibe los empleados (uno o varios) y el origen.
+  function construirHoja(empleados, origen) {
+    var aoa = L.hojaSalida(empleados, { origen: origen, fecha: fechaCorta() });
     var ws = XLSX.utils.aoa_to_sheet(aoa);
 
-    // formato de miles en columnas de dinero (filas de datos y de totales)
+    // formatos: miles + signo visible (subsidio "+", descuentos "-")
+    var z = L.formatosSalida();
     for (var r = 4; r < aoa.length; r++) {
-      L.SALIDA_DINERO.forEach(function (c) {
-        var ref = XLSX.utils.encode_cell({ r: r, c: c });
-        if (ws[ref] && typeof ws[ref].v === 'number') ws[ref].z = '#,##0';
+      Object.keys(z).forEach(function (c) {
+        var ref = XLSX.utils.encode_cell({ r: r, c: Number(c) });
+        if (ws[ref] && typeof ws[ref].v === 'number') ws[ref].z = z[c];
       });
       var refHoras = XLSX.utils.encode_cell({ r: r, c: 4 });
       if (ws[refHoras] && typeof ws[refHoras].v === 'number') ws[refHoras].z = '#,##0';
@@ -324,6 +329,10 @@
     XLSX.utils.book_append_sheet(wbNuevo, ws, 'Nómina');
     var salida = XLSX.write(wbNuevo, { bookType: 'xlsx', type: 'array' });
     return new Blob([salida], { type: MIME_XLSX });
+  }
+
+  function construirSalida(item) {
+    return construirHoja(item.empleados, item.nombre);
   }
 
   /* ------------------------------ Render cola ----------------------------- */
@@ -461,6 +470,7 @@
       '  <div class="resultado-cuerpo">' +
       '    <div class="resultado-acciones">' +
       '      <button class="btn" data-accion="descargar" data-id="' + item.id + '">Descargar este extracto</button>' +
+      '      <button class="btn" data-accion="correo" data-id="' + item.id + '">Enviar por correo</button>' +
       (item.obs.length
         ? '<button class="aviso-obs' + (item.obs.length ? '' : ' ok') + '" data-accion="obs" data-id="' + item.id + '" style="border:none;cursor:pointer">' +
           item.obs.length + ' observación(es) — ver</button>'
@@ -472,22 +482,33 @@
       '</div>';
   }
 
+  function fmtCol(i, v) {
+    // signo visible: subsidio "+", descuentos "-" (pedido del liquidador)
+    if (L.SALIDA_SIGNO[i]) return L.SALIDA_SIGNO[i] + fmtCOP(v);
+    if (L.SALIDA_DINERO.indexOf(i) !== -1) return fmtCOP(v);
+    return fmtNum(v);
+  }
+
   function tablaHTML(item) {
     var cols = L.SALIDA_COLUMNAS;
-    var dinero = L.SALIDA_DINERO;
 
     var head = cols.map(function (c, i) {
       var clase = i >= 3 ? ' class="num"' : '';
       return '<th' + clase + '>' + esc(c) + '</th>';
     }).join('');
 
-    var filas = item.empleados.map(function (e) {
+    var filas = item.empleados.map(function (e, idx) {
       var datos = L.filaSalida(e);
       return '<tr>' + datos.map(function (v, i) {
         var clase = i >= 3 ? ' class="num"' : '';
-        var txt = i >= 3
-          ? (dinero.indexOf(i) !== -1 ? fmtCOP(v) : fmtNum(v))
-          : esc(v);
+        var txt;
+        if (i === 0) {
+          // nombre clicable → abre la ficha individual del trabajador
+          txt = '<td class="celda-nombre" data-accion="ficha" data-id="' + item.id + '" data-i="' + idx +
+            '" title="Ver nómina individual de ' + esc(e.nombre) + '">' + esc(v) + '</td>';
+          return txt;
+        }
+        txt = i >= 3 ? fmtCol(i, v) : esc(v);
         return '<td' + clase + '>' + txt + '</td>';
       }).join('') + '</tr>';
     }).join('');
@@ -496,8 +517,7 @@
     var filaTot = '<tr class="totales">' + totales.map(function (v, i) {
       var clase = i >= 3 ? ' class="num"' : '';
       if (i < 3) return '<td>' + esc(v) + '</td>';
-      var txt = dinero.indexOf(i) !== -1 ? fmtCOP(v) : fmtNum(v);
-      return '<td' + clase + '>' + txt + '</td>';
+      return '<td' + clase + '>' + fmtCol(i, v) + '</td>';
     }).join('') + '</tr>';
 
     return '<div class="tabla-envoltura"><table class="tabla">' +
@@ -556,13 +576,196 @@
     var ws = XLSX.utils.aoa_to_sheet(L.PLANTILLA_FILAS);
     ws['!cols'] = [
       { wch: 30 }, { wch: 14 }, { wch: 11 }, { wch: 7 }, { wch: 8 }, { wch: 12 },
-      { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 17 }
+      { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 17 }, { wch: 24 }
     ];
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Datos');
     var out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     descargar(new Blob([out], { type: MIME_XLSX }), 'Plantilla_Nomina.xlsx');
     aviso('Plantilla descargada. Llena las columnas y súbela acá.', 'ok');
+  }
+
+  /* --------------------------- Ficha del trabajador ------------------------ */
+
+  function slug(txt) {
+    return String(txt || '').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'trabajador';
+  }
+
+  function signoCOP(signo, v) {
+    return (signo || '') + fmtCOP(v);
+  }
+
+  function filasConcepto(lista, signo) {
+    return lista.map(function (c) {
+      return '<div class="fila-concepto"><span>' + esc(c[0]) + '</span>' +
+        '<span class="val">' + signoCOP(signo, c[1]) + '</span></div>';
+    }).join('');
+  }
+
+  function abrirFicha(item, emp) {
+    estado.ficha = { item: item, emp: emp };
+    irA('trabajador');
+    renderFicha();
+  }
+
+  function renderFicha() {
+    var f = estado.ficha;
+    if (!f) return;
+    var emp = f.emp, item = f.item;
+
+    $('#ficha-nombre').textContent = emp.nombre;
+    $('#ficha-meta').textContent =
+      'Archivo: ' + item.nombre + ' · Rol: ' + emp.rolTexto +
+      (emp.cc ? ' · C.C. ' + emp.cc : '') +
+      ' · Hijos: ' + emp.hijos + ' · Horas: ' + Math.round(emp.horas) +
+      ' · Liquidado: ' + fechaCorta();
+
+    var ingresos = [
+      ['Salario base', emp.base],
+      ['Horas extras', emp.extras],
+      ['Dominicales', emp.dominicales],
+      ['Festivos', emp.festivos],
+      ['Nocturnas', emp.nocturnas],
+      ['Primas', emp.prima],
+      ['Subsidio de hijos', emp.subsidio],
+      ['Cesantías', emp.cesantias]
+    ];
+    var descuentos = [
+      ['Salud EPS', emp.salud],
+      ['Pensión', emp.pension],
+      ['Solidaridad', emp.solidaridad],
+      ['Vivienda', emp.vivienda],
+      ['Libranza / préstamo', emp.libranza],
+      ['Otros descuentos', emp.otros]
+    ];
+
+    $('#ficha-cuerpo').innerHTML =
+      '<div class="tarjeta"><h2>Ingresos</h2>' +
+      filasConcepto(ingresos, '+') +
+      '<div class="fila-concepto total"><span>Total ingresos</span><span class="val">' + fmtCOP(emp.totalIngresos) + '</span></div></div>' +
+      '<div class="tarjeta"><h2>Descuentos</h2>' +
+      filasConcepto(descuentos, '-') +
+      '<div class="fila-concepto total"><span>Total descuentos</span><span class="val">' + signoCOP('-', emp.totalDescuentos) + '</span></div></div>' +
+      '<div class="ficha-neto"><span>Neto a pagar</span><b>' + fmtCOP(emp.neto) + '</b></div>';
+  }
+
+  function descargarIndividual() {
+    var f = estado.ficha;
+    if (!f) return;
+    var emp = f.emp;
+    var nombre = 'Extracto_' + (emp.cc ? String(emp.cc).replace(/[^\w.]/g, '') : slug(emp.nombre)) +
+      '_' + baseNombre(f.item.nombre) + '.xlsx';
+    descargar(construirHoja([emp], f.item.nombre + ' — ' + emp.nombre), nombre);
+  }
+
+  /* ---------------------- Paquete de envío por correo ---------------------- */
+
+  var PS1_TEXTO = [
+    '# Envío de nóminas por Outlook — generado por el Liquidador de Nómina',
+    "# Modo: 'enviar' envía directo · 'borrador' abre cada correo en Outlook sin enviar",
+    "$modo = 'enviar'",
+    "$carpeta = Split-Path -Parent $MyInvocation.MyCommand.Path",
+    "$csv = Join-Path $carpeta 'correos.csv'",
+    "$asunto = 'Extracto de nómina'",
+    "$cuerpo = 'Adjunto encontrará el extracto de su nómina. Saludos.'",
+    '',
+    "if (-not (Test-Path $csv)) { Write-Host 'No existe correos.csv en esta carpeta.'; exit 1 }",
+    '',
+    "try { $outlook = New-Object -ComObject Outlook.Application }",
+    "catch { Write-Host 'No se pudo abrir Outlook. ¿Está instalado e iniciado?'; exit 1 }",
+    '',
+    "$filas = Import-Csv -Path $csv -Encoding UTF8",
+    "$enviados = 0",
+    "foreach ($f in $filas) {",
+    "  if (-not $f.correo) { continue }",
+    "  $adj = Join-Path $carpeta ($f.adjunto -replace '/', '\\')",
+    "  $mail = $outlook.CreateItem(0)",
+    "  $mail.To = $f.correo",
+    "  $mail.Subject = $asunto",
+    "  $mail.Body = 'Hola ' + $f.nombre + ', ' + [Environment]::NewLine + [Environment]::NewLine + $cuerpo",
+    "  if (Test-Path $adj) { [void]$mail.Attachments.Add($adj) }",
+    "  if ($modo -eq 'enviar') { $mail.Send() } else { $mail.Display() }",
+    "  $enviados++",
+    "  [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($mail)",
+    "  Start-Sleep -Milliseconds 300",
+    "}",
+    "Write-Host ('Listo: ' + $enviados + ' correo(s) ' + $(if ($modo -eq 'enviar') { 'enviados' } else { 'abiertos como borrador' }))"
+  ].join('\n');
+
+  var BAT_TEXTO = [
+    '@echo off',
+    'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0enviar_correos.ps1"',
+    'pause'
+  ].join('\r\n');
+
+  var LEEME_TEXTO = [
+    'PAQUETE DE ENVÍO DE NÓMINAS — Liquidador de Nómina',
+    '',
+    '1. Doble clic en "enviar_correos.bat".',
+    '2. Se abre Outlook (debe estar instalado e iniciado) y envía un correo',
+    '   a cada trabajador con SOLO su extracto de nómina adjunto.',
+    '',
+    'Contenido:',
+    '  extractos/        un .xlsx por trabajador (únicamente su nómina)',
+    '  correos.csv       destinatarios (nombre, correo, archivo)',
+    '  enviar_correos.ps1  script de envío vía Outlook',
+    '',
+    'Opciones:',
+    '  - Para REVISAR antes de enviar: editá enviar_correos.ps1 y cambiá',
+    '    $modo = "enviar" por $modo = "borrador" (abre cada correo sin enviar).',
+    '  - Para cambiar el asunto o el mensaje, editá $asunto y $cuerpo.',
+    '  - Los trabajadores sin correo se omiten automáticamente.'
+  ].join('\r\n');
+
+  async function prepararEnvio(item) {
+    if (!item) return;
+    if (!item.tieneCorreo) {
+      aviso('"' + item.nombre + '" no tiene columna de Correo. Agregala al Excel o asígnala en Reglas → Columnas del Excel.', 'error');
+      return;
+    }
+    var conCorreo = item.empleados.filter(function (e) { return e.correo; });
+    if (!conCorreo.length) {
+      aviso('Ningún trabajador de "' + item.nombre + '" tiene correo en la columna Correo.', 'error');
+      return;
+    }
+    if (typeof JSZip === 'undefined') {
+      aviso('No se pudo armar el paquete: falta la librería del zip.', 'error');
+      return;
+    }
+
+    var sinCorreo = item.empleados.length - conCorreo.length;
+    var zip = new JSZip();
+    var csv = '\uFEFF"nombre","correo","adjunto"\r\n';
+    var usados = {};
+
+    conCorreo.forEach(function (e) {
+      var base = (e.cc ? String(e.cc).replace(/[^\w.]/g, '') : slug(e.nombre)) || slug(e.nombre);
+      var nombreX = base + '.xlsx';
+      if (usados[nombreX]) nombreX = base + '_' + slug(e.nombre) + '.xlsx';
+      if (usados[nombreX]) nombreX = base + '_' + Math.random().toString(36).slice(2, 6) + '.xlsx';
+      usados[nombreX] = true;
+
+      zip.file('extractos/' + nombreX, construirHoja([e], item.nombre + ' — ' + e.nombre));
+      csv += '"' + e.nombre.replace(/"/g, '""') + '","' + e.correo.replace(/"/g, '""') +
+        '","extractos/' + nombreX + '"\r\n';
+    });
+
+    zip.file('correos.csv', csv);
+    zip.file('enviar_correos.ps1', '\uFEFF' + PS1_TEXTO);
+    zip.file('enviar_correos.bat', BAT_TEXTO);
+    zip.file('LEEME.txt', LEEME_TEXTO);
+
+    try {
+      var blob = await zip.generateAsync({ type: 'blob' });
+      descargar(blob, 'Envio_Nomina_' + baseNombre(item.nombre) + '_' + hoy() + '.zip');
+      aviso('Paquete listo: ' + conCorreo.length + ' correo(s) con su extracto' +
+        (sinCorreo ? ' (' + sinCorreo + ' sin correo omitidos)' : '') +
+        '. Ejecutá enviar_correos.bat para enviarlos por Outlook.', 'ok');
+    } catch (e) {
+      aviso('No se pudo armar el paquete: ' + e.message, 'error');
+    }
   }
 
   /* --------------------------------- Reglas -------------------------------- */
@@ -732,6 +935,11 @@
         ref.el.closest('.resultado').classList.toggle('abierto');
       }
       if (ref.accion === 'descargar') descargarUno(item);
+      if (ref.accion === 'correo') prepararEnvio(item);
+      if (ref.accion === 'ficha') {
+        var i = Number(ref.el.dataset.i);
+        if (item && item.empleados[i]) abrirFicha(item, item.empleados[i]);
+      }
       if (ref.accion === 'obs') {
         var cuerpo = ref.el.closest('.resultado').querySelector('.obs-detalles');
         if (cuerpo) cuerpo.hidden = !cuerpo.hidden;
@@ -739,6 +947,8 @@
     });
 
     $('#btn-zip').addEventListener('click', descargarTodo);
+    $('#btn-volver').addEventListener('click', function () { irA('resultados'); });
+    $('#btn-descargar-individual').addEventListener('click', descargarIndividual);
 
     // reglas
     $('#btn-guardar').addEventListener('click', guardarReglas);

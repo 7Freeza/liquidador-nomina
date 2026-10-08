@@ -564,6 +564,76 @@ button {
   border-top: 2px solid var(--borde-fuerte);
 }
 
+/* --------------------------- Ficha del trabajador ------------------------ */
+
+.celda-nombre {
+  color: var(--acento);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.celda-nombre:hover { text-decoration: underline; }
+
+.ficha {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  max-width: 860px;
+}
+
+.ficha .tarjeta { display: flex; flex-direction: column; }
+
+.fila-concepto {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f2f1;
+  font-size: 13.5px;
+}
+
+.fila-concepto .val {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fila-concepto.total {
+  font-weight: 700;
+  border-bottom: none;
+  margin-top: 2px;
+  padding-top: 12px;
+  border-top: 2px solid var(--borde);
+}
+
+.ficha-neto {
+  grid-column: 1 / -1;
+  background: var(--acento);
+  color: #fff;
+  border-radius: var(--radio);
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--sombra);
+}
+
+.ficha-neto span {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-weight: 650;
+}
+
+.ficha-neto b {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+#btn-volver { margin-bottom: 14px; }
+
 /* ------------------------------ Reglas --------------------------------- */
 
 .rejilla { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
@@ -719,6 +789,8 @@ button {
 @media (max-width: 1020px) {
   .rejilla { grid-template-columns: 1fr; }
   .tarjetas { grid-template-columns: repeat(2, 1fr); }
+  .ficha { grid-template-columns: 1fr; }
+  .ficha-neto { grid-column: auto; }
 }
 
 @media (max-width: 860px) {

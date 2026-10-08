@@ -23,20 +23,20 @@ function guardar(wb, nombre) {
   const filas = [
     ['Nombre completo', 'Cédula', 'Rol', 'Hijos', 'Horas', 'Horas extras',
       'Domingos', 'Festivos', 'Nocturnas', 'Primas', 'Vivienda',
-      'Libranza / préstamo', 'Otros descuentos'],
-    ['Ana Lucía Pérez', '100000001', 'Gerente', 1, 160, 4, 1, 0, 0, 0, 0, 0, 0],
-    ['Carlos Andrés Gómez', '100000002', 'Admin', 3, 176, 0, 0, 1, 10, 150000, 350000, 200000, 0],
-    ['Marta Ruiz', '100000003', 'Operario', 4, 160, 8, 2, 0, 20, 0, 0, 0, 50000],
-    ['Jorge Iván Castro', '100000004', 'Operario', 0, 152, 0, 0, 0, 0, 0, 0, 0, 0],
-    ['EJEMPLO — borrar fila', '0', 'Admin', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    ['Diana Marcela Ortiz', '100000005', 'Gerente', 2, 168, 12, 1, 1, 30, 200000, 0, 0, 0],
-    ['Pedro Nel Sánchez', '100000006', 'ADMINISTRATIVO', 5, 160, 0, 0, 0, 0, 0, 0, 0, 0],
-    ['Laura Sofía Mejía', '100000007', 'Operario', 2, '160', '4', '1', 0, 0, 0, 0, 0, 0],
-    ['Sin Cédula Aquí', '', 'Operario', 1, 80, 0, 0, 0, 0, 0, 0, 0, 0]
+      'Libranza / préstamo', 'Otros descuentos', 'Correo'],
+    ['Ana Lucía Pérez', '100000001', 'Gerente', 1, 160, 4, 1, 0, 0, 0, 0, 0, 0, 'ana.perez@banco.com.co'],
+    ['Carlos Andrés Gómez', '100000002', 'Admin', 3, 176, 0, 0, 1, 10, 150000, 350000, 200000, 0, 'carlos.gomez@banco.com.co'],
+    ['Marta Ruiz', '100000003', 'Operario', 4, 160, 8, 2, 0, 20, 0, 0, 0, 50000, 'marta.ruiz@banco.com.co'],
+    ['Jorge Iván Castro', '100000004', 'Operario', 0, 152, 0, 0, 0, 0, 0, 0, 0, 0, 'jorge.castro@banco.com.co'],
+    ['EJEMPLO — borrar fila', '0', 'Admin', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 'ejemplo@banco.com.co'],
+    ['Diana Marcela Ortiz', '100000005', 'Gerente', 2, 168, 12, 1, 1, 30, 200000, 0, 0, 0, 'diana.ortiz@banco.com.co'],
+    ['Pedro Nel Sánchez', '100000006', 'ADMINISTRATIVO', 5, 160, 0, 0, 0, 0, 0, 0, 0, 0, 'pedro.sanchez@banco.com.co'],
+    ['Laura Sofía Mejía', '100000007', 'Operario', 2, '160', '4', '1', 0, 0, 0, 0, 0, 0, 'laura.mejia@banco.com.co'],
+    ['Sin Cédula Aquí', '', 'Operario', 1, 80, 0, 0, 0, 0, 0, 0, 0, 0, 'sin.cedula@banco.com.co']
   ];
   const ws = XLSX.utils.aoa_to_sheet(filas);
   ws['!cols'] = [{ wch: 26 }, { wch: 12 }, { wch: 14 }, { wch: 7 }, { wch: 7 }, { wch: 8 },
-    { wch: 10 }, { wch: 9 }, { wch: 11 }, { wch: 10 }, { wch: 10 }, { wch: 18 }, { wch: 15 }];
+    { wch: 10 }, { wch: 9 }, { wch: 11 }, { wch: 10 }, { wch: 10 }, { wch: 18 }, { wch: 15 }, { wch: 26 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Datos');
   guardar(wb, 'nomina_marzo_2026.xlsx');

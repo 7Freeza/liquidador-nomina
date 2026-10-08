@@ -1,0 +1,182 @@
+===============================================================================
+  RESOLUCIÓN LÓGICA — LIQUIDADOR DE NÓMINA ADMINISTRATIVA
+  Diagramas para copiar a la libreta
+===============================================================================
+
+LEYENDA DE SÍMBOLOS (diagrama de flujo clásico)
+-------------------------------------------------------------------------------
+ (  )   ÓVALO        → INICIO / FIN
+ /  /   PARALELOGRAMO → ENTRADA o SALIDA (datos que entran o salen)
+ [  ]   RECTÁNGULO    → PROCESO (algo que se calcula o se hace)
+ <>      ROMBO         → DECISIÓN (siempre con dos salidas: SÍ / NO)
+  |v    FLECHA         → sentido del flujo
+
+
+===============================================================================
+ DIAGRAMA 1 — FLUJO GENERAL (vista completa del sistema)
+===============================================================================
+
+                      +---------------+
+                      |    INICIO     |
+                      +-------+-------+
+                              v
+              +=========================================+
+              |  ENTRADA: subir uno o varios Excel      |
+              |  con los datos de los empleados         |
+              +===================+=====================+
+                                  v
+                         <> ?Quedan archivos? <>
+                         +---+-------------+---+
+                   NO ---'                   '--- SÍ
+                    |                             v
+       +-------------------------+   +------------------------------+
+       | SALIDA: vista previa    |   | Leer encabezados y mapear    |
+       | en pantalla             |   | columnas (auto o manual)     |
+       +------------+------------+   +--------------+---------------+
+                    v                             v
+       +-------------------------+         <> ?Reconoce las<>
+       | SALIDA: descargar       |         <> columnas?    <>
+       | individual o TODO en     |         +----+----------+----+
+       | un solo .zip             |     NO ---'                 '--- SÍ
+       +------------+------------+      |                          v
+                    v          +---------------------+  +---------------------+
+              +-----------+    | Marcar ERROR: ese   |  | Procesar filas      |
+              |    FIN    |    | archivo no se       |  | (-> Diagrama 2)     |
+              +-----------+    | procesa             |  +----------+----------+
+                               +----------+----------+             v
+                                          |          +------------------------------+
+                                          |          | Generar el .xlsx de ese      |
+                                          |          | archivo con fila TOTALES     |
+                                          |          +--------------+---------------+
+                                          |                         |
+                                          +-----------+-------------+
+                                                      |
+                                      (flecha de retorno: sube por el
+                                       costado derecho hasta
+                                       ?Quedan archivos? — sigue el lote)
+
+
+===============================================================================
+ DIAGRAMA 2 — PROCESAMIENTO DE UN ARCHIVO (fila por fila)
+===============================================================================
+
+                      +--------------------------+
+                      | Empezar por la 1a fila   |
+                      | del archivo              |
+                      +------------+-------------+
+                                   v
+                            <>  ?Fila valida?  <>     (nombre + rol + horas)
+                            +---------+----------+
+                      NO ---'                    '--- SÍ
+                       v                             v
+        +--------------------------+     +------------------------------+
+        | Registrar OBSERVACION y  |     | LIQUIDAR al empleado         |
+        | omitir la fila           |     | (aplicar reglas -> Diagrama 3)|
+        +------------+-------------+     +--------------+---------------+
+                     |                                  v
+                     |               +------------------------------+
+                     |               | Sumar al total del archivo   |
+                     |               +--------------+---------------+
+                     |                              |
+                     +-------------+----------------+
+                                   v
+                            <>  ?Quedan filas?  <>
+                            +----+------------+----+
+                      SÍ ---'                      '--- NO
+                       |                               v
+                       |          +----------------------------------------+
+                       |          | FIN del archivo: generar extracto      |
+                       +--------->| .xlsx con fila de TOTALES              |
+                        (vuelve)  +----------------------------------------+
+
+
+===============================================================================
+ DIAGRAMA 3 — CALCULO LOGICO DE UN EMPLEADO (el corazon del problema)
+===============================================================================
+
+        +----------------------------------------+
+        | Buscar tarifa del rol:                 |
+        | gerente $100.000/h · admin $80.000/h    |
+        | operario $60.000/h                     |
+        +------------------+---------------------+
+                           v
+        +----------------------------------------+
+        | SALARIO BASE = horas x tarifa          |
+        +------------------+---------------------+
+                           v
+        +----------------------------------------+
+        | SUBSIDIO = min(hijos, 3) x $200.000    |   1 hijo = $200.000
+        | (tope automatico en 3 hijos)           |   2 hijos = $400.000
+        +------------------+---------------------+   3 o mas = $600.000
+                           v
+        +----------------------------------------+
+        | TOTAL LIQUIDADO (ingresos) =           |
+        |   base + extras + dominicales +        |
+        |   festivos + nocturnas + primas +      |
+        |   subsidio (+ cesantias si activa)     |
+        +------------------+---------------------+
+                           v
+        +----------------------------------------+
+        | DESCUENTOS =                           |
+        |   total liquidado x 4%   (salud EPS)   |   <-- se aplican SOBRE
+        | + total liquidado x 4%   (pension)     |       la liquidacion:
+        | + vivienda + libranza + otros          |       "a esta liquidez
+        +------------------+---------------------+        se le hacen
+                           v                               descuentos"
+        +----------------------------------------+
+        | NETO A PAGAR = total liquidado         |
+        |                - total descuentos      |
+        +----------------------------------------+
+
+  Nota: los recargos usan porcentajes configurables (por defecto extras 25%,
+  domingo 50%, festivo 100%, nocturno 35%; cada domingo/festivo equivale a
+  una jornada de 8 horas con su recargo).
+
+
+===============================================================================
+ REGLAS DE NEGOCIO (tabla para escribir al lado del Diagrama 3)
+===============================================================================
+
+  CONCEPTO                    REGLA
+  --------------------------- --------------------------------------------
+  Salario base                horas trabajadas x tarifa del rol
+  Subsidio de hijos           min(hijos, 3) x $200.000
+  Horas extras                horas x tarifa x 1,25   (recargo 25%)
+  Domingos trabajados         8h x tarifa x 1,50      (recargo 50%)
+  Feriados trabajados         8h x tarifa x 2,00      (recargo 100%)
+  Horas nocturnas             horas x tarifa x 1,35   (recargo 35%)
+  Salud EPS                   4% sobre el total liquidado
+  Pension                     4% sobre el total liquidado
+  Vivienda / libranza / otros valor fijo columna por columna del Excel
+  Cesantias (por salida)      8,33% sobre el total liquidado (opcional)
+
+
+===============================================================================
+ QUE SE ANADIO SOBRE LO PEDIDO
+===============================================================================
+
+  1. Proceso por lotes: sube N Excel y se procesan de a 3 en paralelo.
+  2. Descarga total: todos los extractos en un solo .zip con un boton.
+  3. Vista previa en pantalla con observaciones ANTES de descargar.
+  4. Reglas configurables sin tocar el codigo + boton "Reprocesar".
+  5. Lectura tolerante de Excel: reconoce encabezados distintos
+     (CARGO, HRS LABORADAS, APELLIDOS Y NOMBRES...) o mapeo manual.
+  6. Plantilla descargable con el formato oficial de entrada.
+  7. Control de errores por archivo: uno malo no traba a los buenos.
+  8. Reglas nuevas: extras, domingos, feriados, nocturnas, primas,
+     cesantias, vivienda, libranzas.
+  9. Calculo local: los datos no salen de la computadora.
+
+
+===============================================================================
+ GUION CORTO PARA EXPLICAR EN VOZ ALTA
+===============================================================================
+
+  "El sistema recibe los Excel del banco en lote, reconoce solo las
+   columnas (o se las asigna el liquidador), recorre fila por fila
+   validando y aplicando las formulas del diagrama 3 -donde los
+   descuentos de seguridad social se calculan sobre la liquidacion total-
+   y entrega un extracto por archivo con su fila de totales, que se
+   revisa en pantalla y se descarga individual o todo junto en un zip."
+
+===============================================================================
