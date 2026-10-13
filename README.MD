@@ -1,32 +1,208 @@
-# Liquidador de Nómina
+# Sistema de Gestión y Liquidación de Nómina
 
-Aplicación web multiusuario para administrar empleados, roles laborales y liquidaciones individuales. Usa Node.js/Express, PostgreSQL y el motor de cálculo existente. El administrador gestiona usuarios y empleados; el liquidador consulta el directorio y registra liquidaciones, sin permisos para editar datos de empleados.
+Aplicación web empresarial multiusuario diseñada para gestionar el directorio de empleados, estructurar roles laborales, parametrizar reglas salariales y ejecutar la liquidación de nómina con generación y confirmación de comprobantes vía correo electrónico.
 
-## Requisitos
+Desarrollada sobre **Node.js/Express**, **PostgreSQL** y un motor de liquidación matemática autónomo (`logica.js`).
 
-- Node.js 22 o superior y npm
-- PostgreSQL 13 o superior
-- Cuenta Google Workspace y contraseña de aplicación para habilitar el envío SMTP de comprobantes
+---
 
-## Guía paso a paso para arrancar el proyecto
+## 1. Arquitectura y Modelo de Roles
+
+El sistema implementa control de acceso basado en roles (**RBAC** - *Role-Based Access Control*) con segregación estricta de privilegios tanto a nivel de interfaz de usuario como de endpoints en la API REST.
+
+```
+                             ┌─────────────────────────────────┐
+                             │       PANTALLA DE ACCESO        │
+                             │       (/api/auth/login)         │
+                             └────────────────┬────────────────┘
+                                              │
+                      ┌───────────────────────┴───────────────────────┐
+                      ▼                                               ▼
+         ┌─────────────────────────┐                     ┌─────────────────────────┐
+         │   ROL: ADMINISTRADOR    │                     │     ROL: LIQUIDADOR     │
+         │  (Gestión y Estructura) │                     │ (Operación y Entrega)   │
+         └────────────┬────────────┘                     └────────────┬────────────┘
+                      │                                               │
+     ┌────────────────┼────────────────┐             ┌────────────────┼────────────────┐
+     ▼                ▼                ▼             ▼                ▼                ▼
+[Directorio]    [Configuración]   [Operación]   [Directorio]    [Liquidación]     [Entregas]
+- Crear/Editar  - Usuarios        - Liquidar    - Consulta      - Carga de horas  - Monitoreo
+- Eliminar      - Roles/Tarifas   - Entregas      (Lectura)     - Cálculo neto    - Trazabilidad
+- Importar      - Reglas cálculo                                - Enviar email
+```
+
+### Matriz Detallada de Permisos (RBAC)
+
+| Módulo / Acción | Endpoint API | Método | Administrador | Liquidador | Descripción funcional |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **Autenticación** | `/api/auth/login` | `POST` | ✅ | ✅ | Validación de credenciales y regeneración de sesión. |
+| **Cambiar Contraseña** | `/api/auth/password` | `POST` | ✅ | ✅ | Modificación de clave personal (mín. 12 caracteres). |
+| **Consultar Directorio** | `/api/employees` | `GET` | ✅ | ✅ | Búsqueda por texto (nombre, CC, correo) y filtro de rol. |
+| **Crear Empleado** | `/api/employees` | `POST` | ✅ | ❌ (403) | Registro individual con validación de rol y dependientes. |
+| **Editar Empleado** | `/api/employees/:id` | `PUT` | ✅ | ❌ (403) | Actualización de datos demográficos y rol asignado. |
+| **Eliminar Empleado** | `/api/employees/:id` | `DELETE` | ✅ | ❌ (403) | Borrado protegido (impide borrar con nóminas históricas). |
+| **Importar Excel/CSV** | `/api/employees/import` | `POST` | ✅ | ❌ (403) | Carga masiva por documento de identidad. |
+| **Consultar Roles** | `/api/roles` | `GET` | ✅ | ✅ | Lectura de cargos laborales y tarifas por hora. |
+| **Crear Rol** | `/api/roles` | `POST` | ✅ | ❌ (403) | Definición de cargo y tarifa horaria estándar. |
+| **Eliminar Rol** | `/api/roles/:id` | `DELETE` | ✅ | ❌ (403) | Desactivación (impide borrar si tiene empleados activos). |
+| **Consultar Reglas** | `/api/settings` | `GET` | ✅ | ✅ | Lectura de recargos, subsidios y deducciones de ley. |
+| **Modificar Reglas** | `/api/settings` | `PUT` | ✅ | ❌ (403) | Ajuste de subsidio por hijo, recargos y aportes EPS/Pensión. |
+| **Gestión Usuarios** | `/api/users` | `GET/POST`| ✅ | ❌ (403) | Creación y listado de administradores y liquidadores. |
+| **Activar/Desactivar Usuario**| `/api/users/:id` | `PATCH`| ✅ | ❌ (403) | Bloqueo o reactivación de accesos al sistema. |
+| **Liquidar Nómina** | `/api/payrolls` | `POST` | ✅ | ✅ | Aplicación de fórmulas matemáticas y registro histórico. |
+| **Historial Nóminas** | `/api/payrolls` | `GET` | ✅ | ✅ | Consulta de liquidaciones y trazabilidad de comprobantes. |
+| **Enviar Comprobante** | `/api/payrolls/:id/email` | `POST` | ✅ | ✅ | Generación de archivo Excel y despacho SMTP. |
+| **Confirmación Receptor** | `/confirmar/:token` | `GET/POST`| Público | Público | Verificación explícita de recepción por parte del trabajador. |
+
+---
+
+## 2. Diagramas de Casos de Uso
+
+```mermaid
+flowchart LR
+    subgraph Actores
+        Admin["Administrador"]
+        Liq["Liquidador"]
+        Emp["Empleado Destinatario"]
+    end
+
+    subgraph Casos_Administrador["Casos de Uso: Administrador"]
+        CU_Users["Gestionar Usuarios y Roles"]
+        CU_Rules["Parametrizar Reglas Salariales"]
+        CU_Import["Importar Directorio Excel"]
+        CU_CRUD_Emp["Crear / Editar Empleados"]
+    end
+
+    subgraph Casos_Comunes["Casos de Uso Compartidos"]
+        CU_Search["Consultar Empleados"]
+        CU_Calc["Liquidar Horas de Trabajo"]
+        CU_Send["Emitir Comprobante por Email"]
+        CU_Dash["Monitorear Estado de Entregas"]
+        CU_Pass["Gestionar Clave Propia"]
+    end
+
+    subgraph Casos_Receptor["Casos de Uso: Empleado"]
+        CU_Receive["Descargar Archivo Nómina"]
+        CU_Confirm["Confirmar Recepción Vía Token"]
+    end
+
+    Admin --> CU_Users
+    Admin --> CU_Rules
+    Admin --> CU_Import
+    Admin --> CU_CRUD_Emp
+    Admin --> CU_Search
+    Admin --> CU_Calc
+    Admin --> CU_Send
+    Admin --> CU_Dash
+    Admin --> CU_Pass
+
+    Liq --> CU_Search
+    Liq --> CU_Calc
+    Liq --> CU_Send
+    Liq --> CU_Dash
+    Liq --> CU_Pass
+
+    Emp --> CU_Receive
+    Emp --> CU_Confirm
+```
+
+---
+
+## 3. Diagramas de Flujo del Proceso
+
+### Flujo A: Ciclo Operativo de Liquidación y Confirmación
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor L as Liquidador / Admin
+    participant S as Servidor (Express)
+    participant DB as PostgreSQL
+    participant M as Servidor SMTP (Gmail)
+    actor E as Empleado
+
+    L->>S: POST /api/payrolls (ID Empleado, Periodo, Horas trabajadas)
+    S->>DB: Consultar empleado, tarifa por hora y reglas vigentes
+    S->>S: Ejecutar logica.liquidarEmpleado(...)
+    S->>DB: INSERT INTO payrolls (inputs, resultado_neto)
+    S-->>L: 201 Created (Detalle de ingresos, deducciones y neto)
+
+    opt Despacho del Comprobante
+        L->>S: POST /api/payrolls/:id/email
+        S->>S: Generar libro Excel (.xlsx) en memoria
+        S->>S: Generar token criptográfico SHA-256 de confirmación
+        S->>DB: INSERT INTO delivery_events (status='sent', token_hash)
+        S->>M: Enviar correo con extracto adjunto y enlace de confirmación
+        M-->>E: Entrega en buzón institucional/personal
+        S-->>L: 202 Accepted (Notificación despachada)
+    end
+
+    opt Confirmación del Empleado
+        E->>S: GET /confirmar/:token
+        S-->>E: Pantalla web de confirmación
+        E->>S: POST /confirmar/:token
+        S->>DB: UPDATE delivery_events SET status='confirmed', confirmed_at=now()
+        S-->>E: 200 OK ("Recepción confirmada con éxito")
+    end
+```
+
+### Flujo B: Lógica Matemática del Motor de Nómina
+
+```mermaid
+flowchart TD
+    Start(["Inicio: Datos del Empleado y Horas"]) --> Base["Salario Base = Horas * Tarifa_Por_Hora"]
+    
+    Base --> Extras["Recargo Horas Extra = Extras * Tarifa * (1 + %Extra)"]
+    Extras --> Dominicales["Recargo Domingos = Domingos * Jornada * Tarifa * (1 + %Domingo)"]
+    Dominicales --> Festivos["Recargo Festivos = Festivos * Jornada * Tarifa * (1 + %Feriado)"]
+    Festivos --> Nocturnas["Recargo Nocturno = Horas_Nocturnas * Tarifa * (1 + %Nocturno)"]
+    
+    Nocturnas --> Subsidio{"Hijos a cargo > 0?"}
+    Subsidio -- Sí --> CalcSub["Subsidio = Min(Hijos, Tope) * Valor_Subsidio_Hijo"]
+    Subsidio -- No --> NoSub["Subsidio = $0"]
+    
+    CalcSub --> TotalIngresos["Total Ingresos = Base + Recargos + Subsidio + Primas"]
+    NoSub --> TotalIngresos
+    
+    TotalIngresos --> Descuentos["Descuentos Obligatorios:\n- Salud = Base * %Salud\n- Pensión = Base * %Pensión\n- Fondo Solidaridad = Base * %Solidaridad"]
+    Descuentos --> OtrosDesc["Otras Deducciones:\nLibranzas + Vivienda + Descuentos Varios"]
+    OtrosDesc --> TotalDeducciones["Total Deducciones = Descuentos_Ley + Otras_Deducciones"]
+    
+    TotalDeducciones --> Neto["Neto a Pagar = Total Ingresos - Total Deducciones"]
+    Neto --> Fin(["Guardar Liquidación e Histórico"])
+```
+
+---
+
+## 4. Requisitos del Entorno
+
+- **Node.js**: Versión 22 o superior con npm.
+- **PostgreSQL**: Versión 13 o superior.
+- **Google Workspace / Gmail**: Cuenta con verificación en dos pasos y contraseña de aplicación habilitada para el servicio SMTP saliente.
+
+---
+
+## 5. Guía de Instalación y Puesta en Marcha
 
 Sigue estos pasos en orden para iniciar la aplicación correctamente desde cero:
 
 ### Paso 1. Clonar el repositorio e instalar dependencias
 
 ```bash
+git clone <url-del-repositorio>
+cd liquidador-nomina
 npm install
 ```
 
 ### Paso 2. Preparar la base de datos PostgreSQL
 
-Asegúrate de tener PostgreSQL en ejecución y crea la base de datos:
+Asegúrate de tener el motor de PostgreSQL en ejecución y crea la base de datos:
 
 ```bash
 # Opción A (rápida): Con el usuario del sistema o postgres
 sudo -u postgres createdb liquidador_nomina
 
-# Opción B (recomendada en producción): Usuario dedicado con permisos
+# Opción B (recomendada para entornos compartidos): Usuario dedicado
 sudo -u postgres psql -c "CREATE USER liquidador WITH PASSWORD 'tu_clave_segura';"
 sudo -u postgres psql -c "CREATE DATABASE liquidador_nomina OWNER liquidador;"
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE liquidador_nomina TO liquidador;"
@@ -34,122 +210,95 @@ sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE liquidador_nomina TO 
 
 ### Paso 3. Configurar variables de entorno (`.env`)
 
-Copia la plantilla de configuración:
+Copia la plantilla base:
 
 ```bash
 cp -n .env.example .env
 ```
 
-Abre el archivo `.env` y define los parámetros obligatorios:
+Edita el archivo `.env` recién creado con los valores correspondientes a tu entorno:
 
-- `DATABASE_URL`: Cadena de conexión a PostgreSQL (ej. `postgres://liquidador:tu_clave_segura@localhost:5432/liquidador_nomina`).
-- `SESSION_SECRET`: Secreto aleatorio de **mínimo 32 caracteres** (ej. generado con `openssl rand -hex 20`).
-- **Credenciales iniciales de Administrador**:
-  - `ADMIN_EMAIL`: Correo del administrador (ej. `admin@empresa.com`).
-  - `ADMIN_PASSWORD`: Contraseña inicial de **mínimo 12 caracteres** (ej. `lmao090908!!!`).
-  - `ADMIN_NAME`: Nombre del administrador (ej. `Administrador`).
-- **Credenciales iniciales de Liquidador**:
-  - `LIQUIDATOR_EMAIL`: Correo del liquidador (ej. `liquidador@empresa.com`).
-  - `LIQUIDATOR_PASSWORD`: Contraseña inicial de **mínimo 12 caracteres** (ej. `lmao090908!!!`).
-  - `LIQUIDATOR_NAME`: Nombre del liquidador (ej. `Liquidador`).
+```env
+# Conexión a PostgreSQL
+DATABASE_URL=postgres://liquidador:tu_clave_segura@localhost:5432/liquidador_nomina
+
+# Secreto criptográfico de sesión (mínimo 32 caracteres aleatorios)
+SESSION_SECRET=a8f9c2d1e0b4a7c3f5e9d2b8a1c7e4f0a2d9c3b8e7f1a5b9c0d3e6f2a8b4c7d1
+NODE_ENV=development
+PORT=8080
+APP_BASE_URL=http://localhost:8080
+
+# Credenciales iniciales: ADMINISTRADOR (gestión completa)
+ADMIN_NAME=Administrador
+ADMIN_EMAIL=admin@empresa.com
+ADMIN_PASSWORD=lmao090908!!!
+
+# Credenciales iniciales: LIQUIDADOR (operación y nómina)
+LIQUIDATOR_NAME=Liquidador
+LIQUIDATOR_EMAIL=liquidador@empresa.com
+LIQUIDATOR_PASSWORD=lmao090908!!!
+
+# Parámetros SMTP para emisión de comprobantes (Google Workspace)
+GMAIL_USER=nomina@empresa.com
+GMAIL_APP_PASSWORD=tu_clave_de_aplicacion_google
+GMAIL_FROM=Nómina Administrativa <nomina@empresa.com>
+```
 
 > [!NOTE]
-> **Dos perfiles y dos vistas independientes de acceso:**
-> El sistema siembra (*bootstrap*) ambas cuentas directamente al arrancar, permitiendo evaluar de inmediato ambas vistas sin pasos manuales previos:
-> 1. **Vista de Administrador** (`admin@empresa.com`):
->    - Gestión integral de empleados: creación, edición, eliminación y carga masiva desde Excel/CSV.
->    - Gestión de usuarios del sistema (crear y desactivar administradores y liquidadores).
->    - Gestión de roles laborales y tarifas por hora.
->    - Configuración de reglas generales de cálculo de nómina.
->    - Liquidación de nómina y seguimiento de entregas.
-> 2. **Vista de Liquidador** (`liquidador@empresa.com`):
->    - **Consulta de empleados**: búsqueda por nombre, cédula, teléfono, correo o filtro por rol (estrictamente en modo lectura, sin formularios de creación/edición ni eliminación).
->    - **Liquidar horas**: selección de empleado, captura de horas trabajadas, recargos y deducciones, cálculo y envío de comprobantes de pago por correo.
->    - **Seguimiento de entregas**: trazabilidad del estado de envío y confirmación del comprobante.
->    - **Mi cuenta**: gestión de contraseña propia.
->    - *Bloqueo de seguridad*: los módulos de usuarios, roles laborales, reglas y creación/edición de empleados están ocultos en la interfaz y bloqueados en el backend (`HTTP 403`).
+> **Inicialización automática (Bootstrap):**
+> Al arrancar el servidor por primera vez, el sistema:
+> 1. Crea las tablas de base de datos (`users`, `job_roles`, `employees`, `payrolls`, `payroll_settings`, `delivery_events`, `session`).
+> 2. Siembra los roles base: `Gerente`, `Admin` y `Operario`.
+> 3. Registra de inmediato las dos cuentas de acceso (`ADMIN_EMAIL` y `LIQUIDATOR_EMAIL`).
+> 4. Si el directorio está vacío, registra empleados de prueba para permitir liquidaciones inmediatas.
 
-### Paso 4. Arrancar el servidor
+### Paso 4. Arrancar la aplicación
 
-- **Modo desarrollo** (con recarga automática ante cambios):
+- **Modo Desarrollo** (con reinicio ante cambios de código):
   ```bash
   npm run dev
   ```
-- **Modo estándar / producción**:
+- **Modo Estándar / Producción**:
   ```bash
   npm start
   ```
 
-Al arrancar, el servidor:
-1. Crea automáticamente el esquema de tablas en PostgreSQL y la extensión `pgcrypto`.
-2. Inserta los roles laborales predeterminados (`Gerente`, `Admin`, `Operario`) y las reglas de cálculo base.
-3. Registra las cuentas iniciales de **Administrador** y **Liquidador** con sus contraseñas configuradas.
-4. Si el directorio está vacío, inserta empleados de ejemplo para pruebas de liquidación.
-5. Queda escuchando en <http://localhost:8080> (o en el `PORT` configurado).
-
-### Paso 5. Acceso al sistema según el rol
-
-1. Abre en tu navegador <http://localhost:8080>.
-2. **Para ingresar como Administrador**:
-   - Correo: `admin@empresa.com` (o el valor de `ADMIN_EMAIL`).
-   - Contraseña: Tu contraseña configurada en `ADMIN_PASSWORD`.
-   - Visualizarás el **Portal Administrador** con acceso completo al directorio, roles, reglas y usuarios.
-3. **Para ingresar como Liquidador**:
-   - Cierra sesión o abre una ventana privada.
-   - Correo: `liquidador@empresa.com` (o el valor de `LIQUIDATOR_EMAIL`).
-   - Contraseña: Tu contraseña configurada en `LIQUIDATOR_PASSWORD`.
-   - Visualizarás el **Portal Liquidador** con menú específico para consulta de empleados, captura y liquidación de horas trabajadas, y entregas.
-
-### Paso 6. Gestión de usuarios adicionales (Opcional)
-
-Desde la vista de Administrador puedes ir a la sección **Gestión de Usuarios** para crear nuevas cuentas asignando el rol de Administrador o Liquidador según las necesidades de la empresa.
+El servicio quedará disponible en <http://localhost:8080>.
 
 ---
 
-### Configuración opcional: Envío de correos (Gmail / Google Workspace)
+## 6. Manual de Uso según Perfil
 
-El envío usa SMTP de Gmail mediante Nodemailer. Para activarlo:
+### Acceso como Administrador (`admin@empresa.com`)
+1. **Directorio y Empleados:** Permite ingresar nuevos colaboradores manualmente o cargarlos por lote mediante archivos `.xlsx`, `.xls` o `.csv`.
+2. **Roles y Tarifas:** Permite dar de alta cargos salariales y modificar el costo de hora base.
+3. **Reglas de Cálculo:** Permite ajustar porcentajes de aportes parafiscales, recargos por trabajo dominical/nocturno y subsidios familiares.
+4. **Gestión de Usuarios:** Permite crear nuevos colaboradores con rol de *Administrador* o *Liquidador*, así como deshabilitar accesos.
 
-1. Usa una cuenta de Google Workspace con acceso a Gmail y habilita la verificación en dos pasos.
-2. Genera una contraseña de aplicación en la cuenta remitente. Si la organización bloquea las contraseñas de aplicación, el administrador de Workspace debe permitir este método o se debe integrar un proveedor SMTP/OAuth diferente.
-3. Configura `GMAIL_USER` con la cuenta remitente, `GMAIL_APP_PASSWORD` con la contraseña de aplicación y `GMAIL_FROM` con un remitente autorizado para esa cuenta/dominio.
-4. Configura `APP_BASE_URL` con la dirección HTTPS del servidor, accesible desde el dispositivo del empleado. No uses `localhost` en un despliegue compartido: el enlace de confirmación se abre desde el equipo del destinatario.
-5. Permite conexiones salientes al SMTP de Google desde el servidor y verifica la entrega con un buzón de prueba. Para mejorar la entregabilidad del dominio, configura SPF, DKIM y DMARC según las instrucciones de Google Workspace.
+### Acceso como Liquidador (`liquidador@empresa.com`)
+1. **Consulta de Empleados:** Directorio en modo solo lectura para consultar documentos, cargos y datos de contacto (sin botones de edición ni eliminación).
+2. **Liquidar Horas:** Formulario de captura para seleccionar el empleado, definir el mes (`AAAA-MM`), registrar horas diurnas, extras, festivos y deducciones extraordinarias.
+3. **Emisión de Comprobantes:** Con un clic sobre la liquidación reciente, el sistema compila el archivo Excel y lo remite al correo del empleado.
+4. **Seguimiento de Entregas:** Panel de control con métricas en tiempo real de correos enviados, pendientes de lectura y recepciones confirmadas.
 
-Si estas variables no están configuradas, la aplicación seguirá funcionando, pero no enviará comprobantes. El dashboard registra la confirmación cuando el empleado pulsa el enlace; no puede demostrar que leyó el mensaje solo por haberlo abierto. El adjunto contiene información salarial sensible: limita quién puede acceder al correo y evita enviar nóminas a direcciones no verificadas.
+---
 
-Inicia la aplicación:
+## 7. Referencia de Comandos del Proyecto
 
-```bash
-npm run dev
-```
+| Comando | Función |
+| :--- | :--- |
+| `npm run dev` | Inicia el servidor Node.js en modo observador (`--watch`). |
+| `npm start` | Inicia el servidor de producción. |
+| `npm test` | Ejecuta la batería de 90 pruebas automatizadas (fórmulas, casos límite y pipeline). |
+| `npm run build` | Empaqueta la interfaz y lógica en el archivo independiente `Liquidador_Nomina.html`. |
+| `npm run ejemplos` | Genera libros de prueba en la carpeta `ejemplos/`. |
 
-Abre <http://localhost:8080> e inicia sesión con el correo y la contraseña configurados como administrador inicial. Para ejecutar sin reinicio automático, usa `npm start`.
+---
 
-## Puesta en servidor interno
+## 8. Seguridad y Buenas Prácticas
 
-Despliega la aplicación en un equipo accesible por los administradores y liquidadores, instala PostgreSQL y define las variables de `.env` en el entorno del servicio. Configura `NODE_ENV=production`, un `SESSION_SECRET` aleatorio de al menos 32 caracteres y `APP_BASE_URL` con la URL HTTPS interna. Coloca TLS en el proxy inverso o balanceador de la empresa y limita el acceso a la red autorizada.
-
-No subas `.env` ni credenciales al repositorio. `.env.example` contiene valores ficticios que debes reemplazar en `.env`. El `.gitignore` excluye secretos, dependencias instaladas, logs, artefactos temporales y archivos locales del sistema; no excluye archivos necesarios de la aplicación o del despliegue, como `package-lock.json`. La inicialización requiere permisos para crear las tablas de aplicación en la base de datos.
-
-## Funciones
-
-- **Administrador:** crear y editar empleados (nombre, cédula, teléfono, correo, rol e hijos), eliminarlos, importarlos desde Excel/CSV, gestionar usuarios, crear o eliminar roles laborales y mantener las reglas compartidas.
-- **Contraseñas:** la contraseña inicial y las contraseñas temporales de nuevas cuentas deben cambiarse en “Mi cuenta” antes de utilizar las demás funciones.
-- **Liquidador:** buscar y filtrar empleados por rol, liquidar individualmente horas y recargos, guardar el comprobante y enviarlo por correo.
-- **Seguimiento:** el dashboard registra envíos y confirmaciones explícitas. El empleado confirma con el enlace incluido en el correo; una apertura del mensaje no se presenta como lectura verificada.
-- **Importación:** requiere encabezados para nombre, cédula y rol. Teléfono, correo e hijos son opcionales. La cédula identifica el registro: si ya existe, se actualiza. Se omiten filas sin cédula, rol no existente o con nombre iniciado por `Ejemplo`.
-- **Roles laborales:** cada rol tiene una tarifa por hora, que se usa en el cálculo. No se puede eliminar un rol asignado a empleados.
-- **WhatsApp:** no está habilitado en esta versión. Para enviar mensajes y registrar respuestas entrantes se requiere WhatsApp Business Platform o un proveedor compatible, además de credenciales, URL pública/webhook y configuración empresarial. Un número móvil común, por sí solo, no ofrece esa integración desde la aplicación.
-
-## Comandos
-
-| Comando | Acción |
-| --- | --- |
-| `npm run dev` | Arranca la aplicación con reinicio automático al modificar archivos del servidor. |
-| `npm start` | Arranca la aplicación sin modo de observación. |
-| `npm test` | Ejecuta las pruebas de cálculo y del pipeline Excel. |
-| `npm run build` | Genera `Liquidador_Nomina.html` con los archivos de interfaz incluidos. El backend y PostgreSQL siguen siendo necesarios para iniciar sesión y usar las funciones multiusuario. |
-| `npm run ejemplos` | Genera archivos de prueba en `ejemplos/`. |
-
-Las pruebas del pipeline escriben `ejemplos/muestra_extracto_salida.xlsx`.
+- **Cifrado de contraseñas:** Todas las claves se procesan con `bcrypt` (12 rondas de salteo).
+- **Protección de sesiones:** Sesiones persistentes en PostgreSQL (`connect-pg-simple`) con cookies `httpOnly`, `sameSite: strict` y regeneración de ID contra ataques de fijación de sesión.
+- **Seguridad perimetral:** Cabeceras HTTP endurecidas vía `helmet` y limitación de tasa de solicitudes (`rate-limit`) en el inicio de sesión.
+- **Protección contra inyección SQL:** Todas las consultas a PostgreSQL están estrictamente parametrizadas con marcadores de posición (`$1, $2, ...`).
+- **Trazabilidad:** Confirmación de recepción basada en tokens únicos de un solo uso con función hash unidireccional SHA-256.
