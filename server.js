@@ -147,14 +147,44 @@ async function bootstrap() {
   if (adminEmail && adminPassword) {
     if (adminPassword.length < 12) throw new Error('ADMIN_PASSWORD debe tener al menos 12 caracteres.');
     const hash = await bcrypt.hash(adminPassword, 12);
-    await pool.query(`INSERT INTO users(name, email, password_hash, role, password_change_required) VALUES($1, $2, $3, 'admin', true)
-      ON CONFLICT(email) DO NOTHING`, [adminName, adminEmail, hash]);
-    const existingAdmin = await pool.query('SELECT id,password_hash,password_change_required FROM users WHERE email=$1', [adminEmail]);
-    if (existingAdmin.rows[0] && !existingAdmin.rows[0].password_change_required &&
-        await bcrypt.compare(adminPassword, existingAdmin.rows[0].password_hash)) {
-      await pool.query('UPDATE users SET password_change_required=true WHERE id=$1', [existingAdmin.rows[0].id]);
+    const existingAdmin = await pool.query('SELECT id FROM users WHERE email=$1', [adminEmail]);
+    if (!existingAdmin.rows.length) {
+      await pool.query(`INSERT INTO users(name, email, password_hash, role, password_change_required, active)
+        VALUES($1, $2, $3, 'admin', false, true)`, [adminName, adminEmail, hash]);
+    } else {
+      await pool.query(`UPDATE users SET name=$1, password_hash=$2, role='admin', active=true, password_change_required=false
+        WHERE id=$3`, [adminName, hash, existingAdmin.rows[0].id]);
     }
   }
+
+  const liquidatorEmail = text(process.env.LIQUIDATOR_EMAIL || 'liquidador@empresa.com', 254).toLowerCase();
+  const liquidatorPassword = process.env.LIQUIDATOR_PASSWORD || 'lmao090908!!!';
+  const liquidatorName = text(process.env.LIQUIDATOR_NAME || 'Liquidador', 120);
+  if (liquidatorEmail && liquidatorPassword) {
+    if (liquidatorPassword.length < 12) throw new Error('LIQUIDATOR_PASSWORD debe tener al menos 12 caracteres.');
+    const hash = await bcrypt.hash(liquidatorPassword, 12);
+    const existingLiq = await pool.query('SELECT id FROM users WHERE email=$1', [liquidatorEmail]);
+    if (!existingLiq.rows.length) {
+      await pool.query(`INSERT INTO users(name, email, password_hash, role, password_change_required, active)
+        VALUES($1, $2, $3, 'liquidador', false, true)`, [liquidatorName, liquidatorEmail, hash]);
+    } else {
+      await pool.query(`UPDATE users SET name=$1, password_hash=$2, role='liquidador', active=true, password_change_required=false
+        WHERE id=$3`, [liquidatorName, hash, existingLiq.rows[0].id]);
+    }
+  }
+
+  const { rows: empCount } = await pool.query('SELECT count(*)::int AS total FROM employees');
+  if (empCount[0].total === 0) {
+    const { rows: dbRoles } = await pool.query('SELECT id, name FROM job_roles');
+    const roleMap = Object.fromEntries(dbRoles.map(r => [r.name, r.id]));
+    if (roleMap['Operario'] && roleMap['Gerente']) {
+      await pool.query(`INSERT INTO employees (name, national_id, phone, email, role_id, children) VALUES
+        ('Carlos Andrés Pérez', '1010203040', '3001234567', 'carlos.perez@empresa.com', $1, 2),
+        ('María Fernanda Gómez', '1020304050', '3109876543', 'maria.gomez@empresa.com', $2, 1)
+        ON CONFLICT (national_id) DO NOTHING`, [roleMap['Operario'], roleMap['Gerente']]);
+    }
+  }
+
   const { rows: userCount } = await pool.query('SELECT count(*)::int AS total FROM users');
   if (userCount[0].total === 0) throw new Error('Configura ADMIN_EMAIL y ADMIN_PASSWORD para crear la cuenta administradora inicial.');
 }

@@ -8,19 +8,105 @@ Aplicación web multiusuario para administrar empleados, roles laborales y liqui
 - PostgreSQL 13 o superior
 - Cuenta Google Workspace y contraseña de aplicación para habilitar el envío SMTP de comprobantes
 
-## Instalación local
+## Guía paso a paso para arrancar el proyecto
 
-Crea una base de datos PostgreSQL vacía, instala dependencias y prepara la configuración:
+Sigue estos pasos en orden para iniciar la aplicación correctamente desde cero:
+
+### Paso 1. Clonar el repositorio e instalar dependencias
 
 ```bash
-createdb liquidador_nomina
 npm install
+```
+
+### Paso 2. Preparar la base de datos PostgreSQL
+
+Asegúrate de tener PostgreSQL en ejecución y crea la base de datos:
+
+```bash
+# Opción A (rápida): Con el usuario del sistema o postgres
+sudo -u postgres createdb liquidador_nomina
+
+# Opción B (recomendada en producción): Usuario dedicado con permisos
+sudo -u postgres psql -c "CREATE USER liquidador WITH PASSWORD 'tu_clave_segura';"
+sudo -u postgres psql -c "CREATE DATABASE liquidador_nomina OWNER liquidador;"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE liquidador_nomina TO liquidador;"
+```
+
+### Paso 3. Configurar variables de entorno (`.env`)
+
+Copia la plantilla de configuración:
+
+```bash
 cp -n .env.example .env
 ```
 
-Edita `.env` y configura `DATABASE_URL`, `SESSION_SECRET`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`. La contraseña del primer administrador debe tener al menos 12 caracteres; el secreto de sesión debe ser aleatorio y tener al menos 32 caracteres. Al iniciar, el servidor crea las tablas, agrega los roles laborales iniciales y registra al administrador si su correo todavía no existe.
+Abre el archivo `.env` y define los parámetros obligatorios:
 
-### Correo electrónico
+- `DATABASE_URL`: Cadena de conexión a PostgreSQL (ej. `postgres://liquidador:tu_clave_segura@localhost:5432/liquidador_nomina`).
+- `SESSION_SECRET`: Secreto aleatorio de **mínimo 32 caracteres** (ej. generado con `openssl rand -hex 20`).
+- **Credenciales iniciales de Administrador**:
+  - `ADMIN_EMAIL`: Correo del administrador (ej. `admin@empresa.com`).
+  - `ADMIN_PASSWORD`: Contraseña inicial de **mínimo 12 caracteres** (ej. `lmao090908!!!`).
+  - `ADMIN_NAME`: Nombre del administrador (ej. `Administrador`).
+- **Credenciales iniciales de Liquidador**:
+  - `LIQUIDATOR_EMAIL`: Correo del liquidador (ej. `liquidador@empresa.com`).
+  - `LIQUIDATOR_PASSWORD`: Contraseña inicial de **mínimo 12 caracteres** (ej. `lmao090908!!!`).
+  - `LIQUIDATOR_NAME`: Nombre del liquidador (ej. `Liquidador`).
+
+> [!NOTE]
+> **Dos perfiles y dos vistas independientes de acceso:**
+> El sistema siembra (*bootstrap*) ambas cuentas directamente al arrancar, permitiendo evaluar de inmediato ambas vistas sin pasos manuales previos:
+> 1. **Vista de Administrador** (`admin@empresa.com`):
+>    - Gestión integral de empleados: creación, edición, eliminación y carga masiva desde Excel/CSV.
+>    - Gestión de usuarios del sistema (crear y desactivar administradores y liquidadores).
+>    - Gestión de roles laborales y tarifas por hora.
+>    - Configuración de reglas generales de cálculo de nómina.
+>    - Liquidación de nómina y seguimiento de entregas.
+> 2. **Vista de Liquidador** (`liquidador@empresa.com`):
+>    - **Consulta de empleados**: búsqueda por nombre, cédula, teléfono, correo o filtro por rol (estrictamente en modo lectura, sin formularios de creación/edición ni eliminación).
+>    - **Liquidar horas**: selección de empleado, captura de horas trabajadas, recargos y deducciones, cálculo y envío de comprobantes de pago por correo.
+>    - **Seguimiento de entregas**: trazabilidad del estado de envío y confirmación del comprobante.
+>    - **Mi cuenta**: gestión de contraseña propia.
+>    - *Bloqueo de seguridad*: los módulos de usuarios, roles laborales, reglas y creación/edición de empleados están ocultos en la interfaz y bloqueados en el backend (`HTTP 403`).
+
+### Paso 4. Arrancar el servidor
+
+- **Modo desarrollo** (con recarga automática ante cambios):
+  ```bash
+  npm run dev
+  ```
+- **Modo estándar / producción**:
+  ```bash
+  npm start
+  ```
+
+Al arrancar, el servidor:
+1. Crea automáticamente el esquema de tablas en PostgreSQL y la extensión `pgcrypto`.
+2. Inserta los roles laborales predeterminados (`Gerente`, `Admin`, `Operario`) y las reglas de cálculo base.
+3. Registra las cuentas iniciales de **Administrador** y **Liquidador** con sus contraseñas configuradas.
+4. Si el directorio está vacío, inserta empleados de ejemplo para pruebas de liquidación.
+5. Queda escuchando en <http://localhost:8080> (o en el `PORT` configurado).
+
+### Paso 5. Acceso al sistema según el rol
+
+1. Abre en tu navegador <http://localhost:8080>.
+2. **Para ingresar como Administrador**:
+   - Correo: `admin@empresa.com` (o el valor de `ADMIN_EMAIL`).
+   - Contraseña: Tu contraseña configurada en `ADMIN_PASSWORD`.
+   - Visualizarás el **Portal Administrador** con acceso completo al directorio, roles, reglas y usuarios.
+3. **Para ingresar como Liquidador**:
+   - Cierra sesión o abre una ventana privada.
+   - Correo: `liquidador@empresa.com` (o el valor de `LIQUIDATOR_EMAIL`).
+   - Contraseña: Tu contraseña configurada en `LIQUIDATOR_PASSWORD`.
+   - Visualizarás el **Portal Liquidador** con menú específico para consulta de empleados, captura y liquidación de horas trabajadas, y entregas.
+
+### Paso 6. Gestión de usuarios adicionales (Opcional)
+
+Desde la vista de Administrador puedes ir a la sección **Gestión de Usuarios** para crear nuevas cuentas asignando el rol de Administrador o Liquidador según las necesidades de la empresa.
+
+---
+
+### Configuración opcional: Envío de correos (Gmail / Google Workspace)
 
 El envío usa SMTP de Gmail mediante Nodemailer. Para activarlo:
 

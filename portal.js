@@ -4,8 +4,21 @@
   const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
   const money = value => '$ ' + Number(value || 0).toLocaleString('es-CO');
   const state = { user: null, view: 'employees', employees: [], roles: [], payrolls: [], settings: null, query: '', roleId: '', selectedEmployee: null };
-  const adminNav = [['employees', 'Empleados'], ['payroll', 'Liquidar'], ['dashboard', 'Entregas'], ['users', 'Usuarios'], ['roles', 'Roles'], ['settings', 'Reglas'], ['account', 'Mi cuenta']];
-  const liquidatorNav = [['employees', 'Empleados'], ['payroll', 'Liquidar'], ['dashboard', 'Entregas'], ['account', 'Mi cuenta']];
+  const adminNav = [
+    ['employees', 'Directorio y Empleados'],
+    ['payroll', 'Liquidar Nómina'],
+    ['dashboard', 'Seguimiento de Entregas'],
+    ['users', 'Gestión de Usuarios'],
+    ['roles', 'Roles y Tarifas'],
+    ['settings', 'Reglas de Cálculo'],
+    ['account', 'Mi Cuenta']
+  ];
+  const liquidatorNav = [
+    ['employees', 'Consulta de Empleados'],
+    ['payroll', 'Liquidar Horas'],
+    ['dashboard', 'Seguimiento de Entregas'],
+    ['account', 'Mi Cuenta']
+  ];
 
   async function api(url, options = {}) {
     const response = await fetch('/api' + url, { credentials: 'same-origin', ...options });
@@ -23,14 +36,29 @@
     $('#portal').hidden = true;
     $('#auth-screen').hidden = false;
     $('#legacy-app').hidden = true;
+    const view = $('#portal-view');
+    if (view) view.innerHTML = '';
+    const notice = $('#portal-notice');
+    if (notice) { notice.textContent = ''; notice.className = 'portal-notice'; }
+    const errorBox = $('#login-error');
+    if (errorBox) errorBox.textContent = '';
   }
   function showPortal() {
     $('#auth-screen').hidden = true;
     $('#legacy-app').hidden = true;
     $('#portal').hidden = false;
-    $('#portal-user').textContent = `${state.user.name} · ${state.user.role === 'admin' ? 'Administrador' : 'Liquidador'}`;
+    const isAdmin = state.user.role === 'admin';
+    $('#portal').dataset.role = state.user.role;
+    const brandTitle = $('#portal-brand-title');
+    if (brandTitle) brandTitle.textContent = isAdmin ? 'Portal Administrador' : 'Portal Liquidador';
+    const roleBadge = $('#portal-role-badge');
+    if (roleBadge) {
+      roleBadge.textContent = isAdmin ? 'ADMINISTRADOR' : 'LIQUIDADOR';
+      roleBadge.className = `portal-badge badge-${state.user.role}`;
+    }
+    $('#portal-user').textContent = `${state.user.name} · ${isAdmin ? 'Administrador' : 'Liquidador'}`;
     const nav = state.user.passwordChangeRequired ? [['account', 'Cambiar contraseña']]
-      : state.user.role === 'admin' ? adminNav : liquidatorNav;
+      : isAdmin ? adminNav : liquidatorNav;
     $('#portal-nav').innerHTML = nav.map(([key, label]) => `<button class="nav-btn${state.view === key ? ' activo' : ''}" data-view="${key}">${label}</button>`).join('');
     render();
   }
@@ -46,21 +74,29 @@
     render();
   }
   function header(title, copy, action = '') {
-    return `<header class="portal-header"><div><p class="eyebrow">${state.user.role === 'admin' ? 'ADMINISTRACIÓN' : 'LIQUIDACIÓN'}</p><h1>${title}</h1><p>${copy}</p></div>${action}</header>`;
+    const isAdmin = state.user?.role === 'admin';
+    const eyebrowText = isAdmin ? 'PANEL DE ADMINISTRACIÓN' : 'PANEL DE LIQUIDACIÓN';
+    const eyebrowClass = isAdmin ? 'eyebrow eyebrow-admin' : 'eyebrow eyebrow-liquidador';
+    return `<header class="portal-header"><div><p class="${eyebrowClass}">${eyebrowText}</p><h1>${title}</h1><p>${copy}</p></div>${action}</header>`;
   }
   function render() {
+    const isAdmin = state.user && state.user.role === 'admin';
+    const adminOnlyViews = ['users', 'roles', 'settings'];
+    if (!isAdmin && adminOnlyViews.includes(state.view)) {
+      state.view = 'employees';
+    }
     $('#portal-nav').querySelectorAll('[data-view]').forEach(button => button.classList.toggle('activo', button.dataset.view === state.view));
     const view = $('#portal-view');
     if (state.view === 'employees') view.innerHTML = renderEmployees();
     if (state.view === 'payroll') view.innerHTML = renderPayroll();
     if (state.view === 'dashboard') view.innerHTML = renderDashboard();
-    if (state.view === 'users') view.innerHTML = renderUsers();
-    if (state.view === 'roles') view.innerHTML = renderRoles();
-    if (state.view === 'settings') view.innerHTML = renderSettings();
+    if (state.view === 'users') view.innerHTML = isAdmin ? renderUsers() : '';
+    if (state.view === 'roles') view.innerHTML = isAdmin ? renderRoles() : '';
+    if (state.view === 'settings') view.innerHTML = isAdmin ? renderSettings() : '';
     if (state.view === 'account') view.innerHTML = renderAccount();
   }
   function renderEmployees() {
-    const admin = state.user.role === 'admin';
+    const admin = state.user && state.user.role === 'admin';
     const people = state.employees.filter(person => {
       const query = state.query.toLocaleLowerCase();
       return (!query || [person.name, person.nationalId, person.phone, person.email].some(value => String(value || '').toLocaleLowerCase().includes(query))) && (!state.roleId || person.roleId === state.roleId);
@@ -68,8 +104,8 @@
     const roleOptions = `<option value="">Todos los roles</option>` + state.roles.map(role => `<option value="${role.id}"${state.roleId === role.id ? ' selected' : ''}>${esc(role.name)}</option>`).join('');
     const rows = people.map(person => `<tr><td>${esc(person.name)}</td><td>${esc(person.nationalId)}</td><td>${esc(person.roleName)}</td><td>${person.children}</td><td>${esc(person.phone || '—')}</td><td>${esc(person.email || '—')}</td>${admin ? `<td><button class="btn small" data-edit-employee="${person.id}">Editar</button><button class="btn small danger" data-delete-employee="${person.id}">Eliminar</button></td>` : ''}</tr>`).join('');
     const form = admin ? `<section class="portal-section"><h2 id="employee-form-title">Nuevo empleado</h2><form id="employee-form" class="form-grid"><input type="hidden" name="id"><label>Nombre completo<input name="name" maxlength="120" required></label><label>Cédula<input name="nationalId" maxlength="40" required></label><label>Teléfono<input name="phone" type="tel" maxlength="40"></label><label>Correo<input name="email" type="email" maxlength="254"></label><label>Rol<select name="roleId" required>${state.roles.map(role => `<option value="${role.id}">${esc(role.name)}</option>`).join('')}</select></label><label>Número de hijos<input name="children" type="number" min="0" step="1" value="0" required></label><div class="form-actions"><button class="btn primario" type="submit">Guardar empleado</button><button class="btn" type="reset" id="employee-cancel" hidden>Cancelar edición</button></div></form></section>
-      <section class="portal-section"><h2>Importar empleados</h2><form id="import-form" class="inline-form"><input name="file" type="file" accept=".xlsx,.xls,.csv" required><button class="btn" type="submit">Importar Excel/CSV</button><button class="btn" type="button" id="employee-template">Descargar plantilla</button></form><p class="muted">La importación actualiza registros existentes cuando coincide la cédula. Teléfono y correo son opcionales.</p></section>` : '';
-    return `${header('Empleados', admin ? 'Crea, modifica, importa y organiza el directorio.' : 'Consulta empleados por nombre, identificación o rol.')}${form}<section class="portal-section"><div class="filter-row"><label>Buscar<input id="employee-search" type="search" placeholder="Nombre, cédula, teléfono o correo" value="${esc(state.query)}"></label><label>Clasificar<select id="employee-role-filter">${roleOptions}</select></label><span class="muted">${people.length} empleado(s)</span></div><div class="table-scroll"><table class="tabla"><thead><tr><th>Nombre</th><th>Cédula</th><th>Rol</th><th>Hijos</th><th>Teléfono</th><th>Correo</th>${admin ? '<th>Acciones</th>' : ''}</tr></thead><tbody>${rows || `<tr><td colspan="${admin ? 7 : 6}" class="empty-cell">No hay empleados que coincidan.</td></tr>`}</tbody></table></div></section>`;
+      <section class="portal-section"><h2>Importar empleados</h2><form id="import-form" class="inline-form"><input name="file" type="file" accept=".xlsx,.xls,.csv" required><button class="btn" type="submit">Importar Excel/CSV</button><button class="btn" type="button" id="employee-template">Descargar plantilla</button></form><p class="muted">La importación actualiza registros existentes cuando coincide la cédula. Teléfono y correo son opcionales.</p></section>` : `<div class="role-scope-notice"><p><strong>Modo Consulta (Liquidador):</strong> Como Liquidador puedes consultar el directorio y buscar empleados. Para calcular la nómina de un trabajador ingresa a <strong>Liquidar Horas</strong>. La administración de cuentas de empleados, creación, edición, eliminación o importación es función exclusiva del <strong>Administrador</strong>.</p></div>`;
+    return `${header(admin ? 'Directorio y Gestión de Empleados' : 'Consulta de Empleados', admin ? 'Crea, modifica, importa y organiza el directorio laboral.' : 'Directorio de consulta para búsqueda y verificación de nómina.')}${form}<section class="portal-section"><div class="filter-row"><label>Buscar<input id="employee-search" type="search" placeholder="Nombre, cédula, teléfono o correo" value="${esc(state.query)}"></label><label>Clasificar<select id="employee-role-filter">${roleOptions}</select></label><span class="muted">${people.length} empleado(s)</span></div><div class="table-scroll"><table class="tabla"><thead><tr><th>Nombre</th><th>Cédula</th><th>Rol</th><th>Hijos</th><th>Teléfono</th><th>Correo</th>${admin ? '<th>Acciones</th>' : ''}</tr></thead><tbody>${rows || `<tr><td colspan="${admin ? 7 : 6}" class="empty-cell">No hay empleados que coincidan.</td></tr>`}</tbody></table></div></section>`;
   }
   function renderPayroll() {
     const options = state.employees.map(person => `<option value="${person.id}"${state.selectedEmployee === person.id ? ' selected' : ''}>${esc(person.name)} · ${esc(person.roleName)} · ${esc(person.nationalId)}</option>`).join('');
@@ -134,29 +170,41 @@
   async function handleClick(event) {
     const button = event.target.closest('button');
     if (!button) return;
+    const isAdmin = state.user && state.user.role === 'admin';
     try {
       if (button.dataset.view) {
+        if (!isAdmin && ['users', 'roles', 'settings'].includes(button.dataset.view)) {
+          notify('Sección exclusiva para administradores.', true);
+          return;
+        }
         state.view = button.dataset.view;
         state.lastPayrollId = null;
         render();
       } else if (button.dataset.editEmployee) {
+        if (!isAdmin) { notify('Solo el administrador puede editar empleados.', true); return; }
         const person = state.employees.find(item => item.id === button.dataset.editEmployee);
         const form = $('#employee-form');
+        if (!form) return;
         Object.entries({ id: person.id, name: person.name, nationalId: person.nationalId, phone: person.phone, email: person.email, roleId: person.roleId, children: person.children }).forEach(([key, value]) => { form.elements[key].value = value ?? ''; });
         $('#employee-form-title').textContent = `Editar ${person.name}`;
         $('#employee-cancel').hidden = false;
         form.scrollIntoView({ behavior: 'smooth', block: 'center' });
       } else if (button.dataset.deleteEmployee) {
+        if (!isAdmin) { notify('Solo el administrador puede eliminar empleados.', true); return; }
         if (!confirm('¿Eliminar este empleado?')) return;
         await api(`/employees/${button.dataset.deleteEmployee}`, { method: 'DELETE' });
         await refresh(); notify('Empleado eliminado.');
       } else if (button.id === 'employee-cancel') resetEmployeeForm();
-      else if (button.id === 'employee-template') downloadTemplate();
-      else if (button.dataset.deleteRole) {
+      else if (button.id === 'employee-template') {
+        if (!isAdmin) { notify('Solo el administrador gestiona la plantilla de empleados.', true); return; }
+        downloadTemplate();
+      } else if (button.dataset.deleteRole) {
+        if (!isAdmin) { notify('Solo el administrador puede eliminar roles.', true); return; }
         if (!confirm('¿Eliminar este rol?')) return;
         await api(`/roles/${button.dataset.deleteRole}`, { method: 'DELETE' });
         await refresh(); notify('Rol eliminado.');
       } else if (button.dataset.toggleUser) {
+        if (!isAdmin) { notify('Solo el administrador puede gestionar usuarios.', true); return; }
         await api(`/users/${button.dataset.toggleUser}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ active: button.dataset.active !== 'true' }) });
         render(); notify('Estado de usuario actualizado.');
       } else if (button.dataset.sendEmail) {
@@ -168,7 +216,11 @@
   async function handleSubmit(event) {
     event.preventDefault();
     const form = event.target;
+    const isAdmin = state.user && state.user.role === 'admin';
     try {
+      if (['employee-form', 'import-form', 'role-form', 'user-form', 'settings-form'].includes(form.id) && !isAdmin) {
+        throw new Error('Permiso denegado: esta acción corresponde exclusivamente al Administrador.');
+      }
       if (form.id === 'login-form') {
         const body = Object.fromEntries(new FormData(form));
         const data = await api('/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -247,6 +299,9 @@
     $('#logout-button').addEventListener('click', async () => {
       await api('/auth/logout', { method: 'POST' }).catch(() => {});
       state.user = null;
+      state.lastPayrollId = null;
+      state.selectedEmployee = null;
+      state.view = 'employees';
       showLogin();
     });
     try {

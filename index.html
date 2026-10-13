@@ -9,18 +9,34 @@
 <body>
 <section class="auth-screen" id="auth-screen">
   <form class="auth-form" id="login-form">
-    <p class="eyebrow">NÓMINA · ACCESO SEGURO</p>
-    <h1>Liquidador</h1>
+    <p class="eyebrow">PORTAL DE NÓMINA · ACCESO SEGURO</p>
+    <h1>Sistema de Nómina</h1>
+    <p class="auth-subtitle">Ingresa con tus credenciales de <strong>Administrador</strong> o <strong>Liquidador</strong>.</p>
     <label>Correo institucional<input type="email" name="email" autocomplete="username" required></label>
     <label>Contraseña<input type="password" name="password" autocomplete="current-password" required></label>
     <button class="btn primario" type="submit">Iniciar sesión</button>
     <p class="form-error" id="login-error" role="alert"></p>
+
+    <div class="auth-roles-info">
+      <div class="auth-role-card">
+        <span class="auth-role-tag badge-admin">ADMINISTRADOR</span>
+        <p>Gestión completa: empleados, usuarios, roles y reglas de liquidación.</p>
+      </div>
+      <div class="auth-role-card">
+        <span class="auth-role-tag badge-liquidador">LIQUIDADOR</span>
+        <p>Operación: búsqueda de empleados, liquidación de horas y comprobantes.</p>
+      </div>
+    </div>
   </form>
 </section>
 
 <section class="portal" id="portal" hidden>
   <aside class="portal-side">
-    <div class="portal-brand"><strong>Liquidador</strong><small id="portal-user"></small></div>
+    <div class="portal-brand" id="portal-brand-box">
+      <span class="portal-badge" id="portal-role-badge">PANEL</span>
+      <strong id="portal-brand-title">Sistema de Nómina</strong>
+      <small id="portal-user"></small>
+    </div>
     <nav id="portal-nav" aria-label="Secciones"></nav>
     <button class="nav-btn" id="logout-button">Cerrar sesión</button>
   </aside>
